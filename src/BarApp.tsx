@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, minutesAgo, store, stored, type Drink, type Order, type Settings, type Strength, type Tally } from './api'
-import { bumpCart, cartLines, drinkStrength, groupByTab, itemLabel, setStrength, type Cart } from './cart'
+import { bumpCart, cartLines, groupByTab, itemLabel, setStrength, type Cart } from './cart'
 import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
@@ -288,8 +288,8 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, streng
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
   const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
   const lines = cartLines(cart)
-  const bump = (drink_id: string, mixer: string | null, delta: number) =>
-    setCart((c) => bumpCart(c, drink_id, mixer, delta, drinkStrength(c, drink_id)))
+  const bump = (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) =>
+    setCart((c) => bumpCart(c, drink_id, mixer, delta, strength))
   const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
 
   const submit = async () => {
@@ -333,7 +333,7 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, streng
         />
       )}
 
-      <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />
+      {lines.length > 0 && <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />}
 
       <button className="btn-primary text-lg" disabled={!guest.trim() || !lines.length || busy} onClick={submit}>
         {busy ? 'adding…' : 'add to queue'}

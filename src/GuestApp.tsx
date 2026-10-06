@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { api, deviceId, minutesAgo, store, stored, type Order, type Strength } from './api'
-import { bumpCart, cartCount, cartLines, drinkStrength, groupByTab, itemLabel, setStrength, type Cart } from './cart'
+import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, setStrength, type Cart } from './cart'
 import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
@@ -95,6 +95,7 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
   const [cart, setCart] = useState<Cart>({})
   const [tab, setTab] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [review, setReview] = useState(false)
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const drinks = menu.data?.drinks ?? []
@@ -109,9 +110,9 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
   const count = cartCount(cart)
   const open = settings?.ordering_open !== false
 
-  // New lines take the strength already chosen for that spirit, so Light/Stiff applies to every mixer of it.
-  const bump = (drink_id: string, mixer: string | null, delta: number) =>
-    setCart((c) => bumpCart(c, drink_id, mixer, delta, drinkStrength(c, drink_id)))
+  const bump = (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) =>
+    setCart((c) => bumpCart(c, drink_id, mixer, delta, strength))
+  // Changing the pour moves every line of that spirit already in the order.
   const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
 
   const flash = (kind: 'ok' | 'err', text: string) => {
@@ -126,6 +127,7 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
     try {
       const order = await api.placeOrder(name, device, lines)
       setCart({})
+      setReview(false)
       mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
       flash('ok', 'Ordered! A bartender will find you.')
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -207,12 +209,6 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
         )}
       </section>
 
-      {count > 0 && (
-        <section className="mt-6">
-          <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />
-        </section>
-      )}
-
       {doneOrders.length > 0 && (
         <section className="mt-8 divider pt-5">
           <h2 className="display text-2xl mb-3">earlier.</h2>
@@ -222,11 +218,40 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
         </section>
       )}
 
-      {count > 0 && open && (
+      {count > 0 && open && !review && (
         <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">
-          <button className="btn-primary w-full max-w-lg mx-auto flex text-lg fade-up" onClick={placeOrder} disabled={busy}>
-            {busy ? 'sending…' : `order ${count} drink${count === 1 ? '' : 's'}`}
-          </button>
+          <div className="max-w-lg mx-auto flex gap-2 fade-up">
+            <button
+              className="btn-soft px-4 text-lg font-mono !bg-cream"
+              onClick={() => setReview(true)}
+              aria-label={`Review your ${count} drink${count === 1 ? '' : 's'}`}
+            >
+              +{count}
+            </button>
+            <button className="btn-primary flex-1 text-lg" onClick={placeOrder} disabled={busy}>
+              {busy ? 'sending…' : 'complete order'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {review && (
+        <div className="fixed inset-0 z-20 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Your order">
+          <button className="absolute inset-0 bg-cocoa/40" onClick={() => setReview(false)} aria-label="Close" />
+          <div className="relative w-full max-w-lg bg-cream rounded-t-lg border border-taupe/40 p-6 pb-8 max-h-[85dvh] overflow-y-auto fade-up">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h2 className="display text-3xl">your order.</h2>
+              <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={() => setReview(false)} aria-label="Close">×</button>
+            </div>
+            <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} title="" />
+            <p className="font-mono text-xs text-cocoa/60 mt-3">tap − to take something off. everything at zero disappears.</p>
+            <div className="mt-5 flex gap-2">
+              <button className="btn-soft" onClick={() => setReview(false)}>add more</button>
+              <button className="btn-primary flex-1 text-lg" onClick={placeOrder} disabled={busy || count === 0 || !open}>
+                {busy ? 'sending…' : count === 0 ? 'nothing to order' : 'complete order'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
