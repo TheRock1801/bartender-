@@ -48,6 +48,7 @@ export function resolveMixer(mixer: string | null, prefs: Partial<Prefs> | null 
   const p = prefs ?? {}
   if (mixer === 'Coke') return p.coke === 'skinny' ? 'Skinny Coke' : 'Coke'
   if (mixer === 'Lemonade') return p.lemonade === 'skinny' ? 'Skinny Lemonade' : 'Lemonade'
+  if (mixer === 'Juice & Lemonade') return p.lemonade === 'skinny' ? 'Juice & Skinny Lemonade' : 'Juice & Lemonade'
   if (mixer === 'Water') return p.water === 'sparkling' ? 'Sparkling Water' : 'Still Water'
   return mixer
 }

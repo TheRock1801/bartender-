@@ -30,8 +30,11 @@ test('menu is seeded with the two starting drinks and ordering open', async () =
   assert.equal(status, 200)
   assert.deepEqual(body.drinks.slice(0, 4).map((d) => d.name), ['Whiskey Old Fashioned', 'Limoncello Spritz', 'Paloma', 'Bourbon'])
   assert.equal(body.drinks.filter((d) => d.category === 'Spirits').length, 7)
-  assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine'])
+  assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine', 'Soft Drinks'])
   assert.ok(body.mixers.includes('Ginger Beer'))
+  assert.ok(body.mixers.includes('Tonic'))
+  assert.ok(body.mixers.includes('Juice & Lemonade'))
+  assert.ok(body.drinks.some((d) => d.name === 'Juice & Lemonade' && d.category === 'Soft Drinks'))
   assert.ok(body.mixer_variants.includes('Skinny Coke'))
   assert.deepEqual(body.default_prefs, { coke: 'fat', lemonade: 'fat', water: 'still' })
   assert.equal(body.settings.ordering_open, true)
@@ -216,11 +219,11 @@ test('flavour prefs resolve Coke / Lemonade / Water into the exact mixer; barten
   const order = (items, prefs) => call('/api/orders', { method: 'POST', body: { guest_name: 'Tussock', device_id: 'dev-f', items, prefs } })
 
   const skinny = await order(
-    [{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Lemonade' }, { drink_id: bourbon.id, mixer: 'Water' }, { drink_id: bourbon.id, mixer: 'Rocks' }],
-    { coke: 'skinny', lemonade: 'fat', water: 'sparkling' },
+    [{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Lemonade' }, { drink_id: bourbon.id, mixer: 'Water' }, { drink_id: bourbon.id, mixer: 'Rocks' }, { drink_id: bourbon.id, mixer: 'Tonic' }, { drink_id: bourbon.id, mixer: 'Juice & Lemonade' }],
+    { coke: 'skinny', lemonade: 'skinny', water: 'sparkling' },
   )
   assert.equal(skinny.status, 201)
-  assert.deepEqual(skinny.body.items.map((i) => i.mixer), ['Skinny Coke', 'Lemonade', 'Sparkling Water', 'Rocks'])
+  assert.deepEqual(skinny.body.items.map((i) => i.mixer), ['Skinny Coke', 'Skinny Lemonade', 'Sparkling Water', 'Rocks', 'Tonic', 'Juice & Skinny Lemonade'])
 
   // no prefs = regular everything, still water; junk prefs are ignored
   const plain = await order([{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Water' }], { coke: 'diet', water: 42 })

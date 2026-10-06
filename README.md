@@ -8,7 +8,7 @@ queue on their own phones, claim orders so nobody doubles up, and walk the drink
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | Type your name (remembered on the phone), browse three tabs (Spirits, Cocktails, Beer & Wine), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, still water, sparkling, ginger beer), with an optional light or stiff pour. See live status of your drinks. |
+| `/` | Guests | Type your name (remembered on the phone), browse four tabs (Spirits, Cocktails, Beer & Wine, Soft Drinks), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, juice & lemonade, water, ginger beer, tonic), with an optional light or stiff pour. See live status of your drinks. |
 | `/bar` | Bartenders | Shared PIN, then pick your name from the four. Queue (claim / made it / delivered), type in verbal orders, add drinks, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
@@ -45,7 +45,7 @@ npm run build   # type-check + production bundle
 - Tap the bell on the bar screen once so your phone chimes on new orders (browsers need a tap before they'll play sound).
 - "Pause ordering" when the queue gets silly. Guests see a banner and the order button goes away.
 - "Call last orders" puts a banner on every guest's phone. Ordering stays open until you pause it.
-- Menu categories are fixed: Cocktails, Spirits, Beer & Wine (`CATEGORIES`/`MIXERS` in `lib/store.js`). Add a spirit by its name only; guests choose the mixer.
+- Menu categories are fixed: Spirits, Cocktails, Beer & Wine, Soft Drinks (`CATEGORIES`/`MIXERS` in `lib/store.js`). Add a spirit by its name only; guests choose the mixer.
 - Tap any drink (Menu tab, or a drink name in the queue) for its recipe. Edit the steps there, mark it run out, see how many have been ordered tonight, or remove it from the menu.
 - Run out of something: tap the drink, then "Mark run out". Guests see "Run out, sorry" straight away.
 - Someone asks you for a drink while you're walking around: "+ Order" tab, their name, the drinks, done. It lands in the queue for whoever's at the bar.
