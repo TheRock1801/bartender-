@@ -1,0 +1,205 @@
+// All API routes. Deployed as one Vercel function (see vercel.json rewrite);
+// also mounted by server.js for local dev.
+
+import express from 'express'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES } from '../lib/store.js'
+
+export function buildApp(store, { barPin }) {
+  const app = express()
+  app.use(express.json({ limit: '50kb' }))
+
+  const bad = (res, status, error) => res.status(status).json({ error })
+  const str = (v, max = 60) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+
+  async function menuPayload() {
+    const [drinks, settings] = await Promise.all([store.listDrinks(), store.getSettings()])
+    return { drinks, settings }
+  }
+
+  // Normalise a submitted items list against the current menu. Returns {items} or {error}.
+  async function resolveItems(rawItems, { requireAvailable }) {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'Pick at least one drink' }
+    const drinks = await store.listDrinks()
+    const byId = new Map(drinks.map((d) => [d.id, d]))
+    const merged = new Map()
+    for (const it of rawItems) {
+      const d = byId.get(it?.drink_id)
+      if (!d) return { error: 'One of those drinks is no longer on the menu' }
+      if (requireAvailable && !d.available) return { error: `${d.name} has run out, sorry` }
+      const qty = Math.min(10, Math.max(1, Math.floor(Number(it.qty) || 1)))
+      merged.set(d.id, { drink_id: d.id, drink_name: d.name, qty: (merged.get(d.id)?.qty || 0) + qty })
+    }
+    return { items: [...merged.values()] }
+  }
+
+  // ---- Guest routes (no auth) ----
+
+  app.get('/api/menu', async (_req, res, next) => {
+    try { res.json(await menuPayload()) } catch (e) { next(e) }
+  })
+
+  app.post('/api/orders', async (req, res, next) => {
+    try {
+      const guest_name = str(req.body?.guest_name)
+      const device_id = str(req.body?.device_id, 80)
+      if (!guest_name) return bad(res, 400, 'Tell us your name first')
+      if (!device_id) return bad(res, 400, 'Missing device id')
+      const settings = await store.getSettings()
+      if (!settings.ordering_open) return bad(res, 409, 'The bar has paused ordering for a bit')
+      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true })
+      if (error) return bad(res, 400, error)
+      const order = await store.createOrder({ guest_name, device_id, items })
+      res.status(201).json(order)
+    } catch (e) { next(e) }
+  })
+
+  app.get('/api/orders/mine', async (req, res, next) => {
+    try {
+      const device_id = str(req.query.device_id, 80)
+      if (!device_id) return bad(res, 400, 'Missing device id')
+      const orders = await store.listOrders({ device_id })
+      res.json({ orders: orders.slice(-20).reverse() })
+    } catch (e) { next(e) }
+  })
+
+  // ---- Bartender routes (shared PIN in x-bar-pin header) ----
+
+  const bar = express.Router()
+  bar.use((req, res, next) => {
+    const pin = req.get('x-bar-pin') || ''
+    if (!barPin || pin !== barPin) return bad(res, 401, 'Wrong PIN')
+    next()
+  })
+
+  bar.post('/login', (_req, res) => res.json({ ok: true }))
+
+  bar.get('/orders', async (req, res, next) => {
+    try {
+      const all = req.query.all === '1'
+      const orders = await store.listOrders(all ? {} : { statuses: OPEN_STATUSES })
+      const settings = await store.getSettings()
+      res.json({ orders, settings, now: new Date().toISOString() })
+    } catch (e) { next(e) }
+  })
+
+  // Verbal order: bartender types it in on a guest's behalf. Ignores ordering_open
+  // and availability so the bar can always record what it is actually making.
+  bar.post('/orders', async (req, res, next) => {
+    try {
+      const guest_name = str(req.body?.guest_name)
+      const placed_by = str(req.body?.placed_by)
+      if (!guest_name) return bad(res, 400, 'Whose drink is it?')
+      if (!placed_by) return bad(res, 400, 'Missing bartender name')
+      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: false })
+      if (error) return bad(res, 400, error)
+      const order = await store.createOrder({ guest_name, placed_by, items })
+      res.status(201).json(order)
+    } catch (e) { next(e) }
+  })
+
+  bar.patch('/orders/:id', async (req, res, next) => {
+    try {
+      const existing = await store.getOrder(req.params.id)
+      if (!existing) return bad(res, 404, 'Order not found')
+      const by = str(req.body?.by)
+      const action = str(req.body?.action, 20)
+      const patch = {}
+      switch (action) {
+        case 'claim':
+          if (existing.claimed_by && existing.claimed_by !== by && existing.status !== 'new') {
+            return bad(res, 409, `${existing.claimed_by} already has this one`)
+          }
+          patch.claimed_by = by
+          patch.status = 'making'
+          break
+        case 'unclaim':
+          patch.claimed_by = null
+          patch.status = 'new'
+          break
+        case 'ready':
+          patch.status = 'ready'
+          if (!existing.claimed_by) patch.claimed_by = by
+          break
+        case 'delivered':
+          patch.status = 'delivered'
+          if (!existing.claimed_by) patch.claimed_by = by
+          break
+        case 'cancel':
+          patch.status = 'cancelled'
+          break
+        case 'reopen':
+          patch.status = existing.claimed_by ? 'making' : 'new'
+          break
+        default:
+          return bad(res, 400, 'Unknown action')
+      }
+      if (!ORDER_STATUSES.includes(patch.status)) return bad(res, 400, 'Bad status')
+      res.json(await store.updateOrder(existing.id, patch))
+    } catch (e) { next(e) }
+  })
+
+  bar.post('/drinks', async (req, res, next) => {
+    try {
+      const name = str(req.body?.name)
+      if (!name) return bad(res, 400, 'Drink needs a name')
+      const drink = await store.addDrink({
+        name,
+        description: str(req.body?.description, 120),
+        category: str(req.body?.category, 30) || 'Cocktails',
+        added_by: str(req.body?.added_by) || null,
+      })
+      res.status(201).json(drink)
+    } catch (e) { next(e) }
+  })
+
+  bar.patch('/drinks/:id', async (req, res, next) => {
+    try {
+      const patch = {}
+      if (typeof req.body?.available === 'boolean') patch.available = req.body.available
+      if (typeof req.body?.name === 'string' && str(req.body.name)) patch.name = str(req.body.name)
+      if (typeof req.body?.description === 'string') patch.description = str(req.body.description, 120)
+      if (!Object.keys(patch).length) return bad(res, 400, 'Nothing to change')
+      const drink = await store.updateDrink(req.params.id, patch)
+      if (!drink) return bad(res, 404, 'Drink not found')
+      res.json(drink)
+    } catch (e) { next(e) }
+  })
+
+  bar.patch('/settings', async (req, res, next) => {
+    try {
+      const patch = {}
+      for (const k of ['ordering_open', 'last_orders']) {
+        if (typeof req.body?.[k] === 'boolean') patch[k] = req.body[k]
+      }
+      if (!Object.keys(patch).length) return bad(res, 400, 'Nothing to change')
+      res.json(await store.setSettings(patch))
+    } catch (e) { next(e) }
+  })
+
+  app.use('/api/bar', bar)
+
+  app.use('/api', (_req, res) => bad(res, 404, 'Not found'))
+  app.use((err, _req, res, _next) => {
+    console.error(err)
+    bad(res, err.status || 500, err.status ? err.message : 'Something went wrong')
+  })
+  return app
+}
+
+// ---- Vercel entrypoint ----
+let appPromise = null
+function getApp() {
+  if (!appPromise) {
+    appPromise = (async () => {
+      const barPin = process.env.BAR_PIN || (process.env.VERCEL ? '' : '1234')
+      if (!barPin) console.error('[api] BAR_PIN is not set: every bartender request will be rejected')
+      return buildApp(await storeFromEnv(), { barPin })
+    })()
+  }
+  return appPromise
+}
+
+export default async function handler(req, res) {
+  const app = await getApp()
+  return app(req, res)
+}
