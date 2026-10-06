@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS, STRENGTHS } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -16,12 +16,15 @@ export function buildApp(store, { barPin }) {
     return {
       drinks, settings,
       categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, mixers: MIXERS,
+      mixer_variants: MIXER_VARIANTS, pref_options: PREF_OPTIONS, default_prefs: DEFAULT_PREFS,
       strengths: STRENGTHS,
     }
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
-  async function resolveItems(rawItems, { requireAvailable }) {
+  // A guest's base mixer (Coke / Lemonade / Water) is resolved with their flavour prefs;
+  // a bartender can send the resolved variant directly.
+  async function resolveItems(rawItems, { requireAvailable, prefs = {} }) {
     if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'Pick at least one drink' }
     const drinks = await store.listDrinks()
     const byId = new Map(drinks.map((d) => [d.id, d]))
@@ -34,7 +37,8 @@ export function buildApp(store, { barPin }) {
       let mixer = null
       if (d.category === SPIRITS_CATEGORY) {
         mixer = str(it.mixer, 30)
-        if (!MIXERS.includes(mixer)) return { error: `Pick what to have your ${d.name} with` }
+        if (MIXERS.includes(mixer)) mixer = resolveMixer(mixer, prefs)
+        else if (!MIXER_VARIANTS.includes(mixer)) return { error: `Pick what to have your ${d.name} with` }
       } else if (it.mixer) {
         return { error: `${d.name} doesn't come with a mixer` }
       }
@@ -64,7 +68,7 @@ export function buildApp(store, { barPin }) {
       if (!device_id) return bad(res, 400, 'Missing device id')
       const settings = await store.getSettings()
       if (!settings.ordering_open) return bad(res, 409, 'The bar has paused ordering for a bit')
-      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true })
+      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true, prefs: normalisePrefs(req.body?.prefs) })
       if (error) return bad(res, 400, error)
       const order = await store.createOrder({ guest_name, device_id, items })
       res.status(201).json(order)

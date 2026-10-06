@@ -33,13 +33,23 @@ export type Tally = Record<string, number>
 
 export type CartLine = { drink_id: string; mixer?: string | null; strength?: Strength | null; qty: number }
 
+// Flavour preferences, set once per phone. fat = regular, skinny = diet.
+export type Prefs = { coke: 'fat' | 'skinny'; lemonade: 'fat' | 'skinny'; water: 'still' | 'sparkling' }
+export type PrefKey = keyof Prefs
+
+// A guest's pinned favourite. mixer is the BASE mixer (Coke, not Skinny Coke).
+export type Favourite = { drink_id: string; mixer: string | null; strength: Strength | null }
+
 export type MenuPayload = {
   drinks: Drink[]
   settings: Settings
   categories: string[]       // tab order
   spirits_category: string   // drinks in this category are ordered as spirit + mixer
-  mixers: string[]
-  strengths: Strength[]   // light/stiff choice, spirits only
+  mixers: string[]            // base mixers a guest picks from
+  mixer_variants: string[]    // every stored mixer value; bartenders pick from these
+  pref_options: Record<PrefKey, string[]>
+  default_prefs: Prefs
+  strengths: Strength[]       // light/stiff choice, spirits only
 }
 
 async function req<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {
@@ -61,8 +71,8 @@ const json = (data: unknown) => JSON.stringify(data)
 
 export const api = {
   menu: () => req<MenuPayload>('/api/menu'),
-  placeOrder: (guest_name: string, device_id: string, items: CartLine[]) =>
-    req<Order>('/api/orders', { method: 'POST', body: json({ guest_name, device_id, items }) }),
+  placeOrder: (guest_name: string, device_id: string, items: CartLine[], prefs: Partial<Prefs>) =>
+    req<Order>('/api/orders', { method: 'POST', body: json({ guest_name, device_id, items, prefs }) }),
   myOrders: (device_id: string) =>
     req<{ orders: Order[] }>(`/api/orders/mine?device_id=${encodeURIComponent(device_id)}`),
 
@@ -97,6 +107,16 @@ export function deviceId(): string {
   } catch {
     return 'no-storage'
   }
+}
+
+export function storedJson<T>(key: string): T | null {
+  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : null } catch { return null }
+}
+export function storeJson(key: string, value: unknown) {
+  try {
+    if (value === null || value === undefined) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(value))
+  } catch { /* ignore */ }
 }
 
 export function stored(key: string): string {

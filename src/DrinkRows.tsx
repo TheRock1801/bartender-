@@ -5,13 +5,14 @@ import { cartKey, drinkQty, drinkStrength, type Cart } from './cart'
 // One tab's worth of drinks with add/remove controls. Shared by the guest menu
 // and the bartender's verbal-order screen. Spirits expand into a panel with the
 // pour (light / stiff) and the mixers; everything else is a plain add / − / + row.
-export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, strengths, canOrder, compact }: {
+export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, mixerLabel, strengths, canOrder, compact }: {
   drinks: Drink[]
   cart: Cart
   onBump: (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) => void
   onStrength: (drink_id: string, strength: Strength | null) => void
   isSpirit: boolean
   mixers: string[]
+  mixerLabel?: (m: string) => string   // how a mixer chip reads (guests see their flavour, e.g. "skinny coke")
   strengths: Strength[]   // empty = no light/stiff choice on this tab (only spirits get one)
   canOrder: (d: Drink) => boolean
   compact?: boolean
@@ -88,7 +89,7 @@ export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, 
                       return (
                         <div key={m} className={`inline-flex items-center rounded border ${q ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`}>
                           <button className="pl-3 pr-2 py-2 font-mono text-xs lowercase" onClick={() => onBump(d.id, m, 1, strength)}>
-                            {m === 'Rocks' ? 'on the rocks' : m.toLowerCase()}{q > 0 && <span className="ml-1.5 opacity-80">×{q}</span>}
+                            {m === 'Rocks' ? 'on the rocks' : (mixerLabel ? mixerLabel(m) : m).toLowerCase()}{q > 0 && <span className="ml-1.5 opacity-80">×{q}</span>}
                           </button>
                           {q > 0 && (
                             <button className="pr-3 pl-1 py-2 text-base leading-none opacity-80" onClick={() => onBump(d.id, m, -1, strength)} aria-label={`One fewer ${d.name} with ${m}`}>−</button>

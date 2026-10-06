@@ -32,6 +32,8 @@ test('menu is seeded with the two starting drinks and ordering open', async () =
   assert.equal(body.drinks.filter((d) => d.category === 'Spirits').length, 7)
   assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine'])
   assert.ok(body.mixers.includes('Ginger Beer'))
+  assert.ok(body.mixer_variants.includes('Skinny Coke'))
+  assert.deepEqual(body.default_prefs, { coke: 'fat', lemonade: 'fat', water: 'still' })
   assert.equal(body.settings.ordering_open, true)
 })
 
@@ -206,4 +208,28 @@ test('light/stiff is kept per line, validated, and only allowed on spirits', asy
     ['Paloma', null, null, 1],
     ['Speights', null, null, 1],
   ])
+})
+
+test('flavour prefs resolve Coke / Lemonade / Water into the exact mixer; bartenders can send variants', async () => {
+  const { drinks } = (await call('/api/menu')).body
+  const bourbon = drinks.find((d) => d.name === 'Bourbon')
+  const order = (items, prefs) => call('/api/orders', { method: 'POST', body: { guest_name: 'Tussock', device_id: 'dev-f', items, prefs } })
+
+  const skinny = await order(
+    [{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Lemonade' }, { drink_id: bourbon.id, mixer: 'Water' }, { drink_id: bourbon.id, mixer: 'Rocks' }],
+    { coke: 'skinny', lemonade: 'fat', water: 'sparkling' },
+  )
+  assert.equal(skinny.status, 201)
+  assert.deepEqual(skinny.body.items.map((i) => i.mixer), ['Skinny Coke', 'Lemonade', 'Sparkling Water', 'Rocks'])
+
+  // no prefs = regular everything, still water; junk prefs are ignored
+  const plain = await order([{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Water' }], { coke: 'diet', water: 42 })
+  assert.deepEqual(plain.body.items.map((i) => i.mixer), ['Coke', 'Still Water'])
+
+  // a bartender sends the resolved variant straight through
+  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', items: [{ drink_id: bourbon.id, mixer: 'Skinny Lemonade' }] } })
+  assert.equal(verbal.status, 201)
+  assert.equal(verbal.body.items[0].mixer, 'Skinny Lemonade')
+
+  assert.equal((await order([{ drink_id: bourbon.id, mixer: 'Milk' }])).status, 400)
 })

@@ -93,7 +93,8 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const settings = queue.data?.settings
   const drinks = menu.data?.drinks ?? []
   const categories = menu.data?.categories ?? []
-  const mixers = menu.data?.mixers ?? []
+  // Bartenders pick the exact pour (Skinny Coke, Sparkling Water…), not the guest-facing base mixer.
+  const mixers = menu.data?.mixer_variants ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
   const strengths = menu.data?.strengths ?? []
   const tally = queue.data?.tally ?? {}

@@ -30,7 +30,7 @@ lib/store.js        memoryStore() and supabaseStore() behind one interface. Also
                     CATEGORIES, SPIRITS_CATEGORY, MIXERS, STRENGTHS, SEED_DRINKS.
 server.js           local dev only
 src/App.tsx         path router: /bar -> BarApp, everything else -> GuestApp
-src/GuestApp.tsx    Join (name page with read-only menu + recent orders + bartender link) and Menu (ordering)
+src/GuestApp.tsx    Join (name) -> Flavour (prefs slide toggles + FavouritePicker) -> Menu (favourite pinned, ordering)
 src/BarApp.tsx      PIN -> pick name -> Bar (queue / + order / menu tabs, DrinkSheet recipe popup)
 src/DrinkRows.tsx   shared ordering rows (spirit panel with pour + mixers) and CartSummary
 src/cart.ts         cart keyed by drink|mixer|strength; bumpCart, setStrength, itemLabel, groupByTab
@@ -59,7 +59,9 @@ Env vars on Vercel (Production): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (mu
 - Deliberately minimal: no tables, no "where am I", no per-guest order cap, no payments, no accounts, no email. Date doesn't matter.
 - Guests type a name once; the phone remembers it and a device id. Bartenders pick their name from the fixed list `BARTENDERS` in `BarApp.tsx`, never type it.
 - **Menu tabs are fixed and in this order: Spirits, Cocktails, Beer & Wine** (`CATEGORIES`). Spirits is the default tab.
-- **Spirits are ordered as spirit + mixer.** Mixers: Rocks ("on the rocks"), Coke, Lemonade, Water (still), Sparkling, Ginger Beer. A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected.
+- **Spirits are ordered as spirit + mixer.** Guest-facing base mixers (`MIXERS`): Rocks ("on the rocks"), Coke, Lemonade, Water, Ginger Beer. A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected.
+- **Flavour prefs (added later on 2026-10-06):** after the name, a "what's your flavour?" step with three slide toggles: coke fat/skinny, lemonade fat/skinny, water still/sparkling (fat = regular, skinny = diet). Stored on the phone (`aj_prefs`) and sent with every guest order; the server's `resolveMixer()` turns the base mixer into the exact pour and THAT is what `order_items.mixer` stores (Coke / Skinny Coke / Lemonade / Skinny Lemonade / Still Water / Sparkling Water). Bartenders' verbal-order chips are the resolved `MIXER_VARIANTS` directly. `src/cart.ts` has a client copy of resolveMixer for labels, keep the two in step. Older rows may still hold the pre-change mixers "Water (still)"/"Sparkling"; they render as-is.
+- **Favourite:** same step offers "add your favourite" (drink + mixer + pour for a spirit); stored on the phone (`aj_fav`, base mixer) and pinned at the top of the menu with an "add one" button and a "change favourite" link. Hidden if the drink was removed. "your flavour" link next to "not you?" reopens the step.
 - **Light / Stiff pour is spirits only** (Rocky corrected this mid-build: "no only spirits not cocktails"). One pour per spirit in an order; changing it moves every line of that spirit. Null = regular.
 - Pour chips appear only inside a spirit's panel after tapping "choose", never up front (Rocky's second correction). The bottom bar is a `+N` count chip (opens a review sheet with − / + per line) and a "complete order" button.
 - Spirits on the menu: Bourbon, Vodka, Gin, Whisky, Rum, Dark rum, Tequila. Cocktails: Whiskey Old Fashioned, Limoncello Spritz, Paloma (recipes in `instructions`). Beer & Wine: Speights, Red wine, White wine, Sparkling wine. Bartenders add/remove more from the app.
