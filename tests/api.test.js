@@ -30,7 +30,7 @@ test('menu is seeded with the two starting drinks and ordering open', async () =
   assert.equal(status, 200)
   assert.deepEqual(body.drinks.slice(0, 4).map((d) => d.name), ['Whiskey Old Fashioned', 'Limoncello Spritz', 'Paloma', 'Bourbon'])
   assert.equal(body.drinks.filter((d) => d.category === 'Spirits').length, 7)
-  assert.deepEqual(body.categories, ['Cocktails', 'Spirits', 'Beer & Wine'])
+  assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine'])
   assert.ok(body.mixers.includes('Ginger Beer'))
   assert.equal(body.settings.ordering_open, true)
 })

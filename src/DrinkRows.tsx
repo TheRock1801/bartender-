@@ -25,7 +25,7 @@ export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, 
         const total = drinkQty(cart, d.id)
         const open = isSpirit && openId === d.id
         const strength = drinkStrength(cart, d.id)
-        const showStrength = strengths.length > 0 && !off && (open || total > 0)
+        const showStrength = strengths.length > 0 && !off
         return (
           <div key={d.id} className={`card ${compact ? 'py-2.5 px-3' : ''} ${off ? 'opacity-60' : ''}`}>
             <div className="flex items-center gap-3">

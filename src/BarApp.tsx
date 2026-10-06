@@ -348,7 +348,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
   const [instructions, setInstructions] = useState('')
   const [cat, setCat] = useState('Cocktails')
   const [busy, setBusy] = useState(false)
-  const cats = categories.length ? categories : ['Cocktails', 'Spirits', 'Beer & Wine']
+  const cats = categories.length ? categories : ['Spirits', 'Cocktails', 'Beer & Wine']
 
   const add = async () => {
     setBusy(true)
