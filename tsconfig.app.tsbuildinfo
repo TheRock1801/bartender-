@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/barapp.tsx","./src/guestapp.tsx","./src/api.ts","./src/main.tsx","./src/usepoll.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/barapp.tsx","./src/drinkrows.tsx","./src/guestapp.tsx","./src/api.ts","./src/cart.ts","./src/main.tsx","./src/usepoll.ts"],"version":"5.9.3"}

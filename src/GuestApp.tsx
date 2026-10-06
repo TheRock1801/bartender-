@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { api, deviceId, groupByCategory, minutesAgo, store, stored, type CartLine, type Order } from './api'
+import { api, deviceId, minutesAgo, store, stored, type Order } from './api'
+import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
 const NAME_KEY = 'aj_guest_name'
@@ -15,7 +17,7 @@ function Join({ onJoin }: { onJoin: (name: string) => void }) {
   const device = useMemo(deviceId, [])
   const menu = usePoll(api.menu, 30000)
   const mine = usePoll(() => api.myOrders(device), 15000, [device])
-  const groups = groupByCategory(menu.data?.drinks ?? [])
+  const groups = groupByTab(menu.data?.drinks ?? [], menu.data?.categories ?? []).filter(([, list]) => list.length)
   const recent = (mine.data?.orders ?? []).slice(0, 5)
 
   const submit = (e: React.FormEvent) => {
@@ -89,19 +91,23 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
   const device = useMemo(deviceId, [])
   const menu = usePoll(api.menu, 15000)
   const mine = usePoll(() => api.myOrders(device), 5000, [device])
-  const [cart, setCart] = useState<Record<string, number>>({})
+  const [cart, setCart] = useState<Cart>({})
+  const [tab, setTab] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const drinks = menu.data?.drinks ?? []
   const settings = menu.data?.settings
-  const groups = groupByCategory(drinks)
-  const cartLines: CartLine[] = Object.entries(cart).filter(([, q]) => q > 0).map(([drink_id, qty]) => ({ drink_id, qty }))
-  const cartCount = cartLines.reduce((n, l) => n + l.qty, 0)
+  const categories = menu.data?.categories ?? []
+  const mixers = menu.data?.mixers ?? []
+  const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
+  const tabs = groupByTab(drinks, categories)
+  const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
+  const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
+  const count = cartCount(cart)
   const open = settings?.ordering_open !== false
 
-  const bump = (id: string, delta: number) =>
-    setCart((c) => ({ ...c, [id]: Math.max(0, Math.min(10, (c[id] || 0) + delta)) }))
+  const bump = (drink_id: string, mixer: string | null, delta: number) => setCart((c) => bumpCart(c, drink_id, mixer, delta))
 
   const flash = (kind: 'ok' | 'err', text: string) => {
     setToast({ kind, text })
@@ -109,10 +115,11 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
   }
 
   const placeOrder = async () => {
-    if (!cartLines.length || busy) return
+    const lines = cartLines(cart)
+    if (!lines.length || busy) return
     setBusy(true)
     try {
-      const order = await api.placeOrder(name, device, cartLines)
+      const order = await api.placeOrder(name, device, lines)
       setCart({})
       mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
       flash('ok', 'Ordered! A bartender will find you.')
@@ -159,36 +166,44 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
       <section className="mt-6">
         <h2 className="font-display text-xl mb-2">Menu</h2>
         {!menu.data && !menu.error && <p className="text-cocoa/60">Loading the menu…</p>}
-        {groups.map(([cat, list]) => (
-          <div key={cat} className="mb-5">
-            <h3 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">{cat}</h3>
-            <div className="flex flex-col gap-2">
-              {list.map((d) => {
-                const qty = cart[d.id] || 0
-                const off = !d.available || !open
-                return (
-                  <div key={d.id} className={`card flex items-center gap-3 ${off ? 'opacity-60' : ''}`}>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-lg leading-tight">{d.name}</div>
-                      {d.description && <div className="text-sm text-cocoa/60">{d.description}</div>}
-                      {!d.available && <span className="pill bg-cocoa/10 text-cocoa/70 mt-1">Run out, sorry</span>}
-                    </div>
-                    {off ? null : qty === 0 ? (
-                      <button className="btn-soft px-5" onClick={() => bump(d.id, 1)}>Add</button>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <button className="btn-soft w-11 h-11 !px-0 text-xl" onClick={() => bump(d.id, -1)} aria-label="Fewer">−</button>
-                        <span className="w-7 text-center text-lg font-semibold">{qty}</span>
-                        <button className="btn-soft w-11 h-11 !px-0 text-xl" onClick={() => bump(d.id, 1)} aria-label="More">+</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+
+        {tabs.length > 0 && (
+          <div className="flex gap-1 p-1 rounded-2xl bg-sand/60 mb-4">
+            {tabs.map(([cat]) => (
+              <button
+                key={cat}
+                onClick={() => setTab(cat)}
+                className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition ${activeTab === cat ? 'bg-white shadow-sm text-cocoa' : 'text-cocoa/60'}`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
-        ))}
+        )}
+
+        {activeTab && (
+          <>
+            {activeTab === spiritsCategory && activeDrinks.length > 0 && (
+              <p className="text-sm text-cocoa/60 mb-3">Pick a spirit, then what you'd like it with.</p>
+            )}
+            <DrinkRows
+              key={activeTab}
+              drinks={activeDrinks}
+              cart={cart}
+              onBump={bump}
+              isSpirit={activeTab === spiritsCategory}
+              mixers={mixers}
+              canOrder={(d) => d.available && open}
+            />
+          </>
+        )}
       </section>
+
+      {count > 0 && (
+        <section className="mt-6">
+          <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />
+        </section>
+      )}
 
       {doneOrders.length > 0 && (
         <section className="mt-6">
@@ -199,10 +214,10 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
         </section>
       )}
 
-      {cartCount > 0 && open && (
+      {count > 0 && open && (
         <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">
           <button className="btn-primary w-full max-w-lg mx-auto flex text-lg shadow-lg" onClick={placeOrder} disabled={busy}>
-            {busy ? 'Sending…' : `Order ${cartCount} drink${cartCount === 1 ? '' : 's'}`}
+            {busy ? 'Sending…' : `Order ${count} drink${count === 1 ? '' : 's'}`}
           </button>
         </div>
       )}
@@ -240,7 +255,7 @@ function GuestOrderCard({ order }: { order: Order }) {
     <div className="card">
       <div className="flex items-start justify-between gap-2">
         <div className="font-semibold">
-          {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + i.drink_name).join(', ')}
+          {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer)).join(', ')}
         </div>
         <span className="text-xs text-cocoa/50 whitespace-nowrap">{minutesAgo(order.created_at)} min ago</span>
       </div>

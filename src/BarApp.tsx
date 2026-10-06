@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, groupByCategory, minutesAgo, store, stored, type CartLine, type Drink, type Order, type Settings, type Tally } from './api'
+import { api, minutesAgo, store, stored, type Drink, type Order, type Settings, type Tally } from './api'
+import { bumpCart, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
 const PIN_KEY = 'aj_bar_pin'
@@ -88,6 +90,9 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const orders = queue.data?.orders ?? []
   const settings = queue.data?.settings
   const drinks = menu.data?.drinks ?? []
+  const categories = menu.data?.categories ?? []
+  const mixers = menu.data?.mixers ?? []
+  const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
   const tally = queue.data?.tally ?? {}
   const newCount = orders.filter((o) => o.status === 'new').length
   const openDrink = openDrinkId ? drinks.find((d) => d.id === openDrinkId) ?? null : null
@@ -136,8 +141,8 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
       <div className="px-4 mt-4">
         {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
-        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
-        {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
+        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
+        {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
       <nav className="fixed bottom-0 inset-x-0 bg-cream/95 backdrop-blur border-t border-cocoa/10">
@@ -251,8 +256,8 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
           <li key={i.id}>
             <span className="font-semibold">{i.qty}×</span>{' '}
             {i.drink_id ? (
-              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{i.drink_name}</button>
-            ) : i.drink_name}
+              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer)}</button>
+            ) : itemLabel(i.drink_name, i.mixer)}
           </li>
         ))}
       </ul>
@@ -267,37 +272,20 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
 
 // ---- New (verbal) order ----
 
-function DrinkPicker({ drinks, cart, setCart, showUnavailable }: { drinks: Drink[]; cart: Record<string, number>; setCart: (c: Record<string, number>) => void; showUnavailable: boolean }) {
-  const bump = (id: string, d: number) => setCart({ ...cart, [id]: Math.max(0, Math.min(10, (cart[id] || 0) + d)) })
-  return (
-    <>
-      {groupByCategory(drinks.filter((d) => showUnavailable || d.available)).map(([cat, list]) => (
-        <div key={cat}>
-          <h3 className="uppercase tracking-widest text-xs text-cocoa/60 mb-1">{cat}</h3>
-          <div className="flex flex-col gap-1.5">
-            {list.map((d) => {
-              const q = cart[d.id] || 0
-              return (
-                <div key={d.id} className={`flex items-center gap-2 rounded-xl bg-white/70 ring-1 ring-cocoa/10 px-3 py-2 ${!d.available ? 'opacity-60' : ''}`}>
-                  <div className="flex-1 font-semibold">{d.name}{!d.available && <span className="pill bg-cocoa/10 text-cocoa/70 ml-2">out</span>}</div>
-                  <button className="btn-soft w-10 h-10 !px-0" onClick={() => bump(d.id, -1)} disabled={!q}>−</button>
-                  <span className="w-6 text-center font-semibold">{q || ''}</span>
-                  <button className="btn-soft w-10 h-10 !px-0" onClick={() => bump(d.id, 1)}>+</button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </>
-  )
-}
-
-function NewOrder({ pin, me, drinks, onPlaced, onError }: { pin: string; me: string; drinks: Drink[]; onPlaced: (o: Order) => void; onError: (m: string) => void }) {
+function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, onPlaced, onError }: {
+  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string
+  onPlaced: (o: Order) => void; onError: (m: string) => void
+}) {
   const [guest, setGuest] = useState('')
-  const [cart, setCart] = useState<Record<string, number>>({})
+  const [cart, setCart] = useState<Cart>({})
+  const [tab, setTab] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const lines: CartLine[] = Object.entries(cart).filter(([, q]) => q > 0).map(([drink_id, qty]) => ({ drink_id, qty }))
+  const tabs = groupByTab(drinks, categories)
+  const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
+  const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
+  const lines = cartLines(cart)
+  const bump = (drink_id: string, mixer: string | null, delta: number) => setCart((c) => bumpCart(c, drink_id, mixer, delta))
+
   const submit = async () => {
     setBusy(true)
     try {
@@ -314,7 +302,31 @@ function NewOrder({ pin, me, drinks, onPlaced, onError }: { pin: string; me: str
     <div className="flex flex-col gap-4">
       <p className="text-sm text-cocoa/60">Someone asked you for a drink? Put it in the queue so whoever's at the bar sees it.</p>
       <input className="input" placeholder="Whose drink?" value={guest} maxLength={60} onChange={(e) => setGuest(e.target.value)} />
-      <DrinkPicker drinks={drinks} cart={cart} setCart={setCart} showUnavailable />
+
+      {tabs.length > 0 && (
+        <div className="flex gap-1 p-1 rounded-2xl bg-sand/60">
+          {tabs.map(([cat]) => (
+            <button key={cat} onClick={() => setTab(cat)} className={`flex-1 rounded-xl py-2 text-sm font-semibold ${activeTab === cat ? 'bg-white shadow-sm text-cocoa' : 'text-cocoa/60'}`}>
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeTab && (
+        <DrinkRows
+          key={activeTab}
+          drinks={activeDrinks}
+          cart={cart}
+          onBump={bump}
+          isSpirit={activeTab === spiritsCategory}
+          mixers={mixers}
+          canOrder={() => true}
+          compact
+        />
+      )}
+
+      <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />
+
       <button className="btn-primary text-lg" disabled={!guest.trim() || !lines.length || busy} onClick={submit}>
         {busy ? 'Adding…' : 'Add to queue'}
       </button>
@@ -324,13 +336,13 @@ function NewOrder({ pin, me, drinks, onPlaced, onError }: { pin: string; me: str
 
 // ---- Menu management ----
 
-function MenuManager({ pin, me, drinks, tally, onChange, onError, onShowDrink }: { pin: string; me: string; drinks: Drink[]; tally: Tally; onChange: () => void; onError: (m: string) => void; onShowDrink: (id: string) => void }) {
+function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, onShowDrink }: { pin: string; me: string; drinks: Drink[]; categories: string[]; tally: Tally; onChange: () => void; onError: (m: string) => void; onShowDrink: (id: string) => void }) {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [instructions, setInstructions] = useState('')
   const [cat, setCat] = useState('Cocktails')
   const [busy, setBusy] = useState(false)
-  const cats = [...new Set(['Cocktails', 'Mixers', 'Beer & Wine', 'Soft', ...drinks.map((d) => d.category)])]
+  const cats = categories.length ? categories : ['Cocktails', 'Spirits', 'Beer & Wine']
 
   const add = async () => {
     setBusy(true)
@@ -345,7 +357,7 @@ function MenuManager({ pin, me, drinks, tally, onChange, onError, onShowDrink }:
     <div className="flex flex-col gap-6">
       <section className="card flex flex-col gap-2">
         <h2 className="font-semibold">Add a drink</h2>
-        <input className="input" placeholder="Name (e.g. Espresso Martini)" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Gin)' : cat === 'Beer & Wine' ? 'e.g. Speights, Rosé' : 'Name (e.g. Espresso Martini)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="What's in it (optional)" value={desc} maxLength={120} onChange={(e) => setDesc(e.target.value)} />
         <textarea
           className="input min-h-[7rem] text-base"
@@ -359,6 +371,7 @@ function MenuManager({ pin, me, drinks, tally, onChange, onError, onShowDrink }:
             <button key={c} onClick={() => setCat(c)} className={`pill !py-1.5 !px-3 ring-1 ${cat === c ? 'bg-cocoa text-cream ring-cocoa' : 'bg-white ring-cocoa/15'}`}>{c}</button>
           ))}
         </div>
+        {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, water, sparkling, ginger beer), so just the spirit's name here.</p>}
         <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'Adding…' : 'Add to menu'}</button>
       </section>
 

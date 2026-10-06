@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -13,7 +13,7 @@ export function buildApp(store, { barPin }) {
 
   async function menuPayload() {
     const [drinks, settings] = await Promise.all([store.listDrinks(), store.getSettings()])
-    return { drinks, settings }
+    return { drinks, settings, categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, mixers: MIXERS }
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
@@ -27,7 +27,15 @@ export function buildApp(store, { barPin }) {
       if (!d) return { error: 'One of those drinks is no longer on the menu' }
       if (requireAvailable && !d.available) return { error: `${d.name} has run out, sorry` }
       const qty = Math.min(10, Math.max(1, Math.floor(Number(it.qty) || 1)))
-      merged.set(d.id, { drink_id: d.id, drink_name: d.name, qty: (merged.get(d.id)?.qty || 0) + qty })
+      let mixer = null
+      if (d.category === SPIRITS_CATEGORY) {
+        mixer = str(it.mixer, 30)
+        if (!MIXERS.includes(mixer)) return { error: `Pick what to have your ${d.name} with` }
+      } else if (it.mixer) {
+        return { error: `${d.name} doesn't come with a mixer` }
+      }
+      const key = d.id + '|' + (mixer || '')
+      merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, qty: (merged.get(key)?.qty || 0) + qty })
     }
     return { items: [...merged.values()] }
   }
@@ -148,7 +156,7 @@ export function buildApp(store, { barPin }) {
       const drink = await store.addDrink({
         name,
         description: str(req.body?.description, 120),
-        category: str(req.body?.category, 30) || 'Cocktails',
+        category: CATEGORIES.includes(req.body?.category) ? req.body.category : 'Cocktails',
         added_by: str(req.body?.added_by) || null,
         instructions: str(req.body?.instructions, 2000),
       })

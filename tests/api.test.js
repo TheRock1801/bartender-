@@ -28,7 +28,9 @@ async function call(path, { method = 'GET', body, pin } = {}) {
 test('menu is seeded with the two starting drinks and ordering open', async () => {
   const { status, body } = await call('/api/menu')
   assert.equal(status, 200)
-  assert.deepEqual(body.drinks.map((d) => d.name), ['Whiskey Old Fashioned', 'Bourbon & Coke'])
+  assert.deepEqual(body.drinks.map((d) => d.name), ['Whiskey Old Fashioned', 'Bourbon', 'Speights', 'Red wine', 'White wine', 'Sparkling wine'])
+  assert.deepEqual(body.categories, ['Cocktails', 'Spirits', 'Beer & Wine'])
+  assert.ok(body.mixers.includes('Ginger Beer'))
   assert.equal(body.settings.ordering_open, true)
 })
 
@@ -43,12 +45,12 @@ test('guest orders a couple of drinks, bartender claims, makes, delivers', async
   const [of, bc] = drinks
   const placed = await call('/api/orders', {
     method: 'POST',
-    body: { guest_name: 'Sam', device_id: 'dev-1', items: [{ drink_id: of.id, qty: 2 }, { drink_id: bc.id, qty: 1 }, { drink_id: of.id, qty: 1 }] },
+    body: { guest_name: 'Sam', device_id: 'dev-1', items: [{ drink_id: of.id, qty: 2 }, { drink_id: bc.id, qty: 1, mixer: 'Coke' }, { drink_id: of.id, qty: 1 }] },
   })
   assert.equal(placed.status, 201)
   assert.equal(placed.body.status, 'new')
   // duplicate lines are merged
-  assert.deepEqual(placed.body.items.map((i) => [i.drink_name, i.qty]), [['Whiskey Old Fashioned', 3], ['Bourbon & Coke', 1]])
+  assert.deepEqual(placed.body.items.map((i) => [i.drink_name, i.mixer, i.qty]), [['Whiskey Old Fashioned', null, 3], ['Bourbon', 'Coke', 1]])
 
   const mine = await call('/api/orders/mine?device_id=dev-1')
   assert.equal(mine.body.orders.length, 1)
@@ -85,7 +87,7 @@ test('guest order is rejected without a name or with an empty cart', async () =>
 
 test('run-out drinks cannot be ordered by guests but can be recorded by a bartender', async () => {
   const { drinks } = (await call('/api/menu')).body
-  const bc = drinks.find((d) => d.name === 'Bourbon & Coke')
+  const bc = drinks.find((d) => d.name === 'Speights')
   const off = await call(`/api/bar/drinks/${bc.id}`, { method: 'PATCH', pin: PIN, body: { available: false } })
   assert.equal(off.body.available, false)
 
@@ -150,4 +152,28 @@ test('drink instructions save on add and edit, tally counts non-cancelled orders
   const past = all.body.orders.find((o) => o.id === o1.body.id)
   assert.equal(past.items[0].drink_name, 'Negroni')
   assert.equal(past.items[0].drink_id, null)
+})
+
+test('spirits need a valid mixer, other drinks refuse one, and spirit+mixer lines merge separately', async () => {
+  const { drinks } = (await call('/api/menu')).body
+  const bourbon = drinks.find((d) => d.name === 'Bourbon')
+  const speights = drinks.find((d) => d.name === 'Speights')
+  const order = (body) => call('/api/orders', { method: 'POST', body: { guest_name: 'Ari', device_id: 'dev-m', items: body } })
+
+  assert.equal((await order([{ drink_id: bourbon.id, qty: 1 }])).status, 400)
+  assert.equal((await order([{ drink_id: bourbon.id, qty: 1, mixer: 'Milk' }])).status, 400)
+  assert.equal((await order([{ drink_id: speights.id, qty: 1, mixer: 'Coke' }])).status, 400)
+
+  const ok = await order([
+    { drink_id: bourbon.id, qty: 1, mixer: 'Coke' },
+    { drink_id: bourbon.id, qty: 1, mixer: 'Rocks' },
+    { drink_id: bourbon.id, qty: 2, mixer: 'Coke' },
+    { drink_id: speights.id, qty: 1 },
+  ])
+  assert.equal(ok.status, 201)
+  assert.deepEqual(ok.body.items.map((i) => [i.drink_name, i.mixer, i.qty]), [['Bourbon', 'Coke', 3], ['Bourbon', 'Rocks', 1], ['Speights', null, 1]])
+
+  // the tally counts the spirit regardless of mixer
+  const queue = await call('/api/bar/orders', { pin: PIN })
+  assert.ok(queue.body.tally[bourbon.id] >= 4)
 })
