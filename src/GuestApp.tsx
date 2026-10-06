@@ -12,13 +12,19 @@ export default function GuestApp() {
 
 function Join({ onJoin }: { onJoin: (name: string) => void }) {
   const [value, setValue] = useState('')
+  const device = useMemo(deviceId, [])
+  const menu = usePoll(api.menu, 30000)
+  const mine = usePoll(() => api.myOrders(device), 15000, [device])
+  const groups = groupByCategory(menu.data?.drinks ?? [])
+  const recent = (mine.data?.orders ?? []).slice(0, 5)
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const n = value.trim()
     if (n) onJoin(n)
   }
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <main className="min-h-dvh flex flex-col items-center px-4 pt-10 pb-10 max-w-lg mx-auto">
       <Header />
       <form onSubmit={submit} className="card w-full max-w-sm mt-8 flex flex-col gap-4">
         <label className="text-lg font-semibold">What's your name?</label>
@@ -34,6 +40,38 @@ function Join({ onJoin }: { onJoin: (name: string) => void }) {
         <button className="btn-primary text-lg" disabled={!value.trim()}>Let's drink</button>
         <p className="text-sm text-cocoa/60">So the bartenders know whose drink is whose. Your phone remembers it.</p>
       </form>
+
+      {recent.length > 0 && (
+        <section className="w-full mt-8">
+          <h2 className="font-display text-xl mb-2">Recent orders from this phone</h2>
+          <div className="flex flex-col gap-2">
+            {recent.map((o) => <GuestOrderCard key={o.id} order={o} />)}
+          </div>
+        </section>
+      )}
+
+      <section className="w-full mt-8">
+        <h2 className="font-display text-xl mb-2">On the menu tonight</h2>
+        {!menu.data && !menu.error && <p className="text-cocoa/60">Loading the menu…</p>}
+        {menu.error && !menu.data && <p className="text-cocoa/60">Can't reach the bar right now.</p>}
+        {groups.map(([cat, list]) => (
+          <div key={cat} className="mb-4">
+            <h3 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">{cat}</h3>
+            <div className="flex flex-col gap-2">
+              {list.map((d) => (
+                <div key={d.id} className={`card py-3 ${d.available ? '' : 'opacity-60'}`}>
+                  <div className="font-semibold leading-tight">{d.name}</div>
+                  {d.description && <div className="text-sm text-cocoa/60">{d.description}</div>}
+                  {!d.available && <span className="pill bg-cocoa/10 text-cocoa/70 mt-1">Run out, sorry</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {menu.data && groups.length === 0 && <p className="text-cocoa/60">The bartenders are still writing the list.</p>}
+      </section>
+
+      <a href="/bar" className="btn-ghost mt-10 text-sm">Bartender login</a>
     </main>
   )
 }
