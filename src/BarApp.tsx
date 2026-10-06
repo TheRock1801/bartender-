@@ -48,10 +48,11 @@ function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
   return (
     <main className="min-h-dvh flex items-center justify-center px-6">
       <form onSubmit={submit} className="card w-full max-w-xs flex flex-col gap-3">
-        <h1 className="font-display text-2xl">Bar</h1>
+        <p className="eyebrow">jansen and aria</p>
+        <h1 className="display text-3xl">bar.</h1>
         <input className="input tracking-widest text-center" inputMode="numeric" autoFocus placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
-        {err && <p className="text-red-700 text-sm">{err}</p>}
-        <button className="btn-primary" disabled={!pin || busy}>In</button>
+        {err && <p className="text-amber text-sm">{err}</p>}
+        <button className="btn-primary" disabled={!pin || busy}>in</button>
       </form>
     </main>
   )
@@ -61,7 +62,8 @@ function NameScreen({ onOk }: { onOk: (name: string) => void }) {
   return (
     <main className="min-h-dvh flex items-center justify-center px-6">
       <div className="card w-full max-w-xs flex flex-col gap-3">
-        <h1 className="font-display text-2xl">Who's pouring?</h1>
+        <p className="eyebrow">jansen and aria</p>
+        <h1 className="display text-3xl">who's pouring?</h1>
         <div className="grid grid-cols-2 gap-2">
           {BARTENDERS.map((n) => (
             <button key={n} className="btn-soft text-lg py-4" onClick={() => onOk(n)}>{n}</button>
@@ -121,36 +123,36 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
   return (
     <main className="min-h-dvh pb-24 max-w-lg mx-auto">
-      <header className="px-4 pt-4 pb-2 flex items-center justify-between">
+      <header className="px-5 pt-6 pb-3 flex items-end justify-between">
         <div>
-          <h1 className="font-display text-2xl leading-none">Bar</h1>
-          <p className="text-xs text-cocoa/60 mt-1">
-            {me} · <button className="underline" onClick={onLogout}>switch</button>
+          <h1 className="display text-3xl">bar.</h1>
+          <p className="font-mono text-xs text-cocoa/60 mt-1">
+            {me.toLowerCase()} · <button className="underline underline-offset-4" onClick={onLogout}>switch</button>
           </p>
         </div>
         <ChimeToggle />
       </header>
 
       {settings && (
-        <div className="px-4 flex gap-2">
+        <div className="px-5 flex gap-2">
           <Toggle on={!settings.ordering_open} label={settings.ordering_open ? 'Pause ordering' : 'Paused · tap to resume'} onClick={() => toggleSetting({ ordering_open: !settings.ordering_open })} />
           <Toggle on={settings.last_orders} label={settings.last_orders ? 'Last orders ON' : 'Call last orders'} onClick={() => toggleSetting({ last_orders: !settings.last_orders })} />
         </div>
       )}
 
-      {queue.error && <p className="mx-4 mt-3 rounded-xl bg-red-100 text-red-800 px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing last known queue.</p>}
+      {queue.error && <p className="mx-4 mt-3 rounded bg-amber text-cream px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing last known queue.</p>}
 
-      <div className="px-4 mt-4">
+      <div className="px-5 mt-5">
         {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
         {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
         {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-cream/95 backdrop-blur border-t border-cocoa/10">
+      <nav className="fixed bottom-0 inset-x-0 bg-cream/95 backdrop-blur border-t border-taupe/30">
         <div className="max-w-lg mx-auto grid grid-cols-3">
-          <TabBtn active={tab === 'queue'} onClick={() => setTab('queue')}>Queue{newCount > 0 && <span className="ml-1.5 pill bg-amber text-white">{newCount}</span>}</TabBtn>
-          <TabBtn active={tab === 'new'} onClick={() => setTab('new')}>+ Order</TabBtn>
-          <TabBtn active={tab === 'menu'} onClick={() => setTab('menu')}>Menu</TabBtn>
+          <TabBtn active={tab === 'queue'} onClick={() => setTab('queue')}>queue{newCount > 0 && <span className="ml-1.5 pill bg-amber text-cream">{newCount}</span>}</TabBtn>
+          <TabBtn active={tab === 'new'} onClick={() => setTab('new')}>+ order</TabBtn>
+          <TabBtn active={tab === 'menu'} onClick={() => setTab('menu')}>menu</TabBtn>
         </div>
       </nav>
 
@@ -166,14 +168,14 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
         />
       )}
 
-      {toast && <div className="fixed top-4 inset-x-4 mx-auto max-w-md rounded-xl bg-cocoa text-cream px-4 py-3 text-center font-semibold shadow-lg">{toast}</div>}
+      {toast && <div className="fixed top-4 inset-x-4 mx-auto max-w-md rounded bg-cocoa text-cream px-4 py-3 text-center font-semibold fade-up">{toast}</div>}
     </main>
   )
 }
 
 function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold ring-1 ${on ? 'bg-amber text-white ring-amber' : 'bg-white/70 text-cocoa ring-cocoa/15'}`}>
+    <button onClick={onClick} className={`flex-1 rounded px-3 py-2 font-mono text-xs lowercase border ${on ? 'bg-amber text-cream border-amber' : 'bg-transparent text-cocoa border-taupe/60'}`}>
       {label}
     </button>
   )
@@ -181,7 +183,7 @@ function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: (
 
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={`py-4 text-sm font-semibold flex items-center justify-center ${active ? 'text-cocoa border-t-2 border-cocoa -mt-px' : 'text-cocoa/50'}`}>
+    <button onClick={onClick} className={`py-4 font-display font-bold text-base tracking-tight flex items-center justify-center ${active ? 'text-cocoa border-t-2 border-cocoa -mt-px' : 'text-cocoa/50'}`}>
       {children}
     </button>
   )
@@ -197,25 +199,25 @@ function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]
   const others = open.filter((o) => o.status !== 'new' && o.claimed_by !== me)
 
   if (loading) return <p className="text-cocoa/60">Loading…</p>
-  if (!open.length) return <p className="card text-center text-cocoa/60 py-10">Nothing waiting. Go mingle.</p>
+  if (!open.length) return <p className="divider pt-8 font-mono text-sm text-cocoa/60">nothing waiting. go mingle.</p>
 
   return (
     <div className="flex flex-col gap-6">
       <Section title={`Up for grabs (${grabs.length})`} empty="All claimed">
         {grabs.map((o) => (
           <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
-            <button className="btn-amber flex-1" onClick={() => act(o, 'claim')}>I've got it</button>
-            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>Cancel</button>
+            <button className="btn-amber flex-1" onClick={() => act(o, 'claim')}>i've got it</button>
+            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>cancel</button>
           </OrderCard>
         ))}
       </Section>
       <Section title={`Mine (${mine.length})`} empty="Nothing on the go">
         {mine.map((o) => (
           <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
-            {o.status === 'making' && <button className="btn-primary flex-1" onClick={() => act(o, 'ready')}>Made it</button>}
-            {o.status === 'ready' && <button className="btn-primary flex-1 !bg-sage" onClick={() => act(o, 'delivered')}>Delivered</button>}
-            {o.status === 'making' && <button className="btn-ghost" onClick={() => act(o, 'unclaim')}>Put back</button>}
-            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>Cancel</button>
+            {o.status === 'making' && <button className="btn-primary flex-1" onClick={() => act(o, 'ready')}>made it</button>}
+            {o.status === 'ready' && <button className="btn-primary flex-1 !bg-sage" onClick={() => act(o, 'delivered')}>delivered</button>}
+            {o.status === 'making' && <button className="btn-ghost" onClick={() => act(o, 'unclaim')}>put back</button>}
+            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>cancel</button>
           </OrderCard>
         ))}
       </Section>
@@ -223,7 +225,7 @@ function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]
         <Section title={`Others are on it (${others.length})`} empty="">
           {others.map((o) => (
             <OrderCard key={o.id} order={o} nowMs={nowMs} muted onShowDrink={onShowDrink}>
-              {o.status === 'ready' && <button className="btn-soft flex-1" onClick={() => act(o, 'delivered')}>I delivered it</button>}
+              {o.status === 'ready' && <button className="btn-soft flex-1" onClick={() => act(o, 'delivered')}>i delivered it</button>}
             </OrderCard>
           ))}
         </Section>
@@ -235,7 +237,7 @@ function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]
 function Section({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
   return (
     <section>
-      <h2 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">{title}</h2>
+      <h2 className="label mb-2">{title}</h2>
       <div className="flex flex-col gap-2">
         {children.length ? children : empty ? <p className="text-sm text-cocoa/50 px-1">{empty}</p> : null}
       </div>
@@ -249,8 +251,8 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
   return (
     <div className={`card ${muted ? 'opacity-70' : ''}`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="font-display text-xl leading-tight">{order.guest_name}</div>
-        <span className={`pill ${late ? 'bg-red-100 text-red-800' : 'bg-cocoa/10 text-cocoa/70'}`}>{mins} min</span>
+        <div className="font-display font-bold text-2xl tracking-tight leading-none">{order.guest_name}</div>
+        <span className={`pill ${late ? 'bg-amber text-cream' : 'bg-sand/70 text-cocoa/80'}`}>{mins} min</span>
       </div>
       <ul className="mt-1.5 text-lg">
         {order.items.map((i) => (
@@ -259,11 +261,11 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
             {i.drink_id ? (
               <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer, i.strength)}</button>
             ) : itemLabel(i.drink_name, i.mixer, i.strength)}
-            {i.strength && <span className={`pill ml-2 capitalize ${i.strength === 'stiff' ? 'bg-amber text-white' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
+            {i.strength && <span className={`pill ml-2 capitalize ${i.strength === 'stiff' ? 'bg-amber text-cream' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
           </li>
         ))}
       </ul>
-      <div className="mt-1 text-xs text-cocoa/50">
+      <div className="mt-1 font-mono text-[0.7rem] text-cocoa/50">
         {order.placed_by ? `Taken by ${order.placed_by}` : 'From the app'}
         {order.claimed_by && ` · ${order.claimed_by} ${order.status === 'ready' ? 'has it ready' : 'is making it'}`}
       </div>
@@ -304,14 +306,14 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, streng
   }
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-cocoa/60">Someone asked you for a drink? Put it in the queue so whoever's at the bar sees it.</p>
+      <p className="font-mono text-xs text-cocoa/60">someone asked you for a drink? put it in the queue so whoever's at the bar sees it.</p>
       <input className="input" placeholder="Whose drink?" value={guest} maxLength={60} onChange={(e) => setGuest(e.target.value)} />
 
       {tabs.length > 0 && (
-        <div className="flex gap-1 p-1 rounded-2xl bg-sand/60">
+        <div className="flex gap-6 border-b border-taupe/30 overflow-x-auto">
           {tabs.map(([cat]) => (
-            <button key={cat} onClick={() => setTab(cat)} className={`flex-1 rounded-xl py-2 text-sm font-semibold ${activeTab === cat ? 'bg-white shadow-sm text-cocoa' : 'text-cocoa/60'}`}>
-              {cat}
+            <button key={cat} onClick={() => setTab(cat)} className={`pb-2 -mb-px whitespace-nowrap font-display font-bold text-base tracking-tight border-b-2 ${activeTab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}>
+              {cat.toLowerCase()}
             </button>
           ))}
         </div>
@@ -334,7 +336,7 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, streng
       <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />
 
       <button className="btn-primary text-lg" disabled={!guest.trim() || !lines.length || busy} onClick={submit}>
-        {busy ? 'Adding…' : 'Add to queue'}
+        {busy ? 'adding…' : 'add to queue'}
       </button>
     </div>
   )
@@ -361,8 +363,8 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="card flex flex-col gap-2">
-        <h2 className="font-semibold">Add a drink</h2>
+      <section className="flex flex-col gap-2 divider pt-5">
+        <h2 className="display text-2xl mb-1">add a drink.</h2>
         <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Gin)' : cat === 'Beer & Wine' ? 'e.g. Speights, Rosé' : 'Name (e.g. Espresso Martini)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="What's in it (optional)" value={desc} maxLength={120} onChange={(e) => setDesc(e.target.value)} />
         <textarea
@@ -374,24 +376,25 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
         />
         <div className="flex gap-2 flex-wrap">
           {cats.map((c) => (
-            <button key={c} onClick={() => setCat(c)} className={`pill !py-1.5 !px-3 ring-1 ${cat === c ? 'bg-cocoa text-cream ring-cocoa' : 'bg-white ring-cocoa/15'}`}>{c}</button>
+            <button key={c} onClick={() => setCat(c)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${cat === c ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60 text-cocoa'}`}>{c.toLowerCase()}</button>
           ))}
         </div>
         {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, water, sparkling, ginger beer), so just the spirit's name here.</p>}
-        <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'Adding…' : 'Add to menu'}</button>
+        <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'adding…' : 'add to menu'}</button>
       </section>
 
       <section>
-        <h2 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">On the menu · tap a drink for the recipe</h2>
-        <div className="flex flex-col gap-1.5">
+        <h2 className="display text-2xl mb-1">on the menu.</h2>
+        <p className="label mb-2">tap a drink for the recipe</p>
+        <div className="flex flex-col">
           {drinks.map((d) => (
-            <button key={d.id} onClick={() => onShowDrink(d.id)} className={`text-left flex items-center gap-3 rounded-xl ring-1 px-3 py-2.5 ${d.available ? 'bg-white/70 ring-cocoa/10' : 'bg-cocoa/5 ring-cocoa/10 opacity-70'}`}>
+            <button key={d.id} onClick={() => onShowDrink(d.id)} className={`text-left flex items-center gap-3 row w-full ${d.available ? '' : 'opacity-60'}`}>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">{d.name}</div>
-                <div className="text-xs text-cocoa/50">{d.category}{d.description && ` · ${d.description}`}{!d.instructions && ' · no recipe yet'}</div>
+                <div className="font-mono text-[0.7rem] text-cocoa/50">{d.category.toLowerCase()}{d.description && ` · ${d.description}`}{!d.instructions && ' · no recipe yet'}</div>
               </div>
-              <span className="pill bg-cocoa/10 text-cocoa/70" title="Ordered tonight">{tally[d.id] || 0} ordered</span>
-              <span className={`pill ${d.available ? 'bg-sage/20 text-sage' : 'bg-cocoa/10 text-cocoa/70'}`}>{d.available ? 'Available' : 'Run out'}</span>
+              <span className="pill bg-sand/70 text-cocoa/80" title="Ordered tonight">{tally[d.id] || 0} ordered</span>
+              <span className={`pill ${d.available ? 'bg-sage/20 text-sage' : 'bg-sand/70 text-cocoa/80'}`}>{d.available ? 'Available' : 'Run out'}</span>
             </button>
           ))}
         </div>
@@ -427,24 +430,24 @@ function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError
   return (
     <div className="fixed inset-0 z-20 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={drink.name}>
       <button className="absolute inset-0 bg-cocoa/40" onClick={onClose} aria-label="Close" />
-      <div className="relative w-full max-w-lg bg-cream rounded-t-3xl sm:rounded-3xl shadow-xl p-5 pb-8 max-h-[90dvh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-cream rounded-t-lg sm:rounded-lg border border-taupe/40 p-6 pb-8 max-h-[90dvh] overflow-y-auto fade-up">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-display text-2xl leading-tight">{drink.name}</h2>
-            <p className="text-sm text-cocoa/60 mt-0.5">{drink.category}{drink.description && ` · ${drink.description}`}</p>
+            <h2 className="font-display font-extrabold text-3xl tracking-tightest leading-none">{drink.name}</h2>
+            <p className="font-mono text-xs text-cocoa/60 mt-2">{drink.category.toLowerCase()}{drink.description && ` · ${drink.description}`}</p>
           </div>
           <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="mt-4 flex gap-2 flex-wrap">
-          <span className="pill bg-amber/20 text-amber !text-sm !px-3 !py-1">{ordered} ordered tonight</span>
-          <span className={`pill !text-sm !px-3 !py-1 ${drink.available ? 'bg-sage/20 text-sage' : 'bg-cocoa/10 text-cocoa/70'}`}>{drink.available ? 'Available' : 'Run out'}</span>
+          <span className="pill bg-amber/15 text-amber !text-xs !px-3 !py-1">{ordered} ordered tonight</span>
+          <span className={`pill !text-xs !px-3 !py-1 ${drink.available ? 'bg-sage/20 text-sage' : 'bg-sand/70 text-cocoa/80'}`}>{drink.available ? 'Available' : 'Run out'}</span>
         </div>
 
         <section className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="uppercase tracking-widest text-xs text-cocoa/60">How to make it</h3>
-            {!editing && <button className="btn-ghost !py-0 text-sm" onClick={() => setEditing(true)}>Edit</button>}
+            <h3 className="label">how to make it</h3>
+            {!editing && <button className="btn-ghost !py-0 font-mono text-xs lowercase" onClick={() => setEditing(true)}>edit</button>}
           </div>
           {editing ? (
             <div className="flex flex-col gap-2">
@@ -457,8 +460,8 @@ function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError
                 onChange={(e) => setText(e.target.value)}
               />
               <div className="flex gap-2">
-                <button className="btn-primary flex-1" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save recipe'}</button>
-                {drink.instructions && <button className="btn-ghost" onClick={() => { setText(drink.instructions); setEditing(false) }}>Cancel</button>}
+                <button className="btn-primary flex-1" disabled={busy} onClick={save}>{busy ? 'saving…' : 'save recipe'}</button>
+                {drink.instructions && <button className="btn-ghost" onClick={() => { setText(drink.instructions); setEditing(false) }}>cancel</button>}
               </div>
             </div>
           ) : (
@@ -467,17 +470,17 @@ function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError
         </section>
 
         <div className="mt-6 flex gap-2 items-center">
-          <button className="btn-soft flex-1" disabled={busy} onClick={toggle}>{drink.available ? 'Mark run out' : 'Back on the menu'}</button>
+          <button className="btn-soft flex-1" disabled={busy} onClick={toggle}>{drink.available ? 'mark run out' : 'back on the menu'}</button>
           {confirmRemove ? (
             <>
-              <button className="btn-primary !bg-red-700" disabled={busy} onClick={remove}>{busy ? 'Removing…' : 'Yes, remove'}</button>
-              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>Keep</button>
+              <button className="btn-primary !bg-amber" disabled={busy} onClick={remove}>{busy ? 'removing…' : 'yes, remove'}</button>
+              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>keep</button>
             </>
           ) : (
-            <button className="btn-ghost text-red-700" onClick={() => setConfirmRemove(true)}>Remove</button>
+            <button className="btn-ghost text-amber" onClick={() => setConfirmRemove(true)}>remove</button>
           )}
         </div>
-        {confirmRemove && <p className="text-xs text-cocoa/60 mt-2">Takes it off the menu for good. Past orders keep the name.</p>}
+        {confirmRemove && <p className="font-mono text-xs text-cocoa/60 mt-2">takes it off the menu for good. past orders keep the name.</p>}
       </div>
     </div>
   )
@@ -510,8 +513,12 @@ function ChimeToggle() {
     beep()
   }
   return (
-    <button onClick={toggle} className={`rounded-full w-11 h-11 text-lg ring-1 ${on ? 'bg-amber text-white ring-amber' : 'bg-white/70 ring-cocoa/15'}`} aria-label="Toggle new-order chime" title="Chime on new orders">
-      {on ? '🔔' : '🔕'}
+    <button onClick={toggle} className={`rounded w-11 h-11 inline-flex items-center justify-center border ${on ? 'bg-amber text-cream border-amber' : 'bg-transparent text-cocoa border-taupe/60'}`} aria-label="Toggle new-order chime" aria-pressed={on} title="Chime on new orders">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
+        <path d="M10 20a2 2 0 0 0 4 0" />
+        {!on && <path d="M4 4l16 16" />}
+      </svg>
     </button>
   )
 }

@@ -51,6 +51,10 @@ npm run build   # type-check + production bundle
 - Someone asks you for a drink while you're walking around: "+ Order" tab, their name, the drinks, done. It lands in the queue for whoever's at the bar.
 - Wi-Fi drops: the app keeps polling and shows the last known queue. Nothing is lost server-side.
 
+## Look
+
+Warm, editorial stationery feel. Tokens live in `tailwind.config.js` (ivory `cream`, `sand`, `taupe`, `peach`, espresso `cocoa`, burnt-orange `amber`) and the reusable classes in `src/index.css` (`display` headings in League Spartan, `label`/`eyebrow` in IBM Plex Mono, `btn-*`, `card`, `row`, `divider`, `input`, `pill`). Fonts load from Google Fonts with system fallbacks. Orange is for primary actions and small accents only. Reduced-motion is respected; a faint paper grain sits behind the page.
+
 ## Layout
 
 ```
