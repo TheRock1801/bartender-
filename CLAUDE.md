@@ -30,7 +30,7 @@ lib/store.js        memoryStore() and supabaseStore() behind one interface. Also
                     CATEGORIES, SPIRITS_CATEGORY, MIXERS, STRENGTHS, SEED_DRINKS.
 server.js           local dev only
 src/App.tsx         path router: /bar -> BarApp, everything else -> GuestApp
-src/GuestApp.tsx    Join (name) -> Flavour (prefs slide toggles + FavouritePicker) -> Menu (favourite pinned, ordering)
+src/GuestApp.tsx    Join (name lookup / is-that-you / initial) -> Flavour (prefs slide toggles + FavouritePicker) -> Menu (favourite pinned, ordering)
 src/BarApp.tsx      PIN -> pick name -> Bar (queue / + order / menu tabs, DrinkSheet recipe popup)
 src/DrinkRows.tsx   shared ordering rows (spirit panel with pour + mixers) and CartSummary
 src/cart.ts         cart keyed by drink|mixer|strength; bumpCart, setStrength, itemLabel, groupByTab
@@ -49,18 +49,20 @@ tests/api.test.js   node:test, 10 tests
 - `orders`: id, guest_name, device_id, placed_by (bartender for verbal orders), status new/making/ready/delivered/cancelled, claimed_by, created_at, updated_at
 - `order_items`: id, order_id (cascade), drink_id (set null on drink delete), drink_name, mixer, strength, qty
 - `settings`: key/value jsonb (`ordering_open`, `last_orders`)
+- `guests` (added 2026-10-07): id, name, name_key (unique, lowercased/trimmed), device_id (phone currently using it), prefs jsonb, favourite jsonb, timestamps. **A guest's name IS their account.**
 
-**Migrations, run manually in the Supabase SQL editor, in this order** (no migration runner; all idempotent): `supabase_schema.sql`, `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql`, `supabase_strength_migration.sql`. **All five were confirmed run by Rocky on 2026-10-06.** A new column needs a new file and Rocky has to run it before the deploy that uses it, or writes fail.
+**Migrations, run manually in the Supabase SQL editor, in this order** (no migration runner; all idempotent): `supabase_schema.sql`, `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql`, `supabase_strength_migration.sql`, `supabase_guests_migration.sql`. **The first five were confirmed run by Rocky on 2026-10-06; the guests one was handed over 2026-10-07 and not yet confirmed.** A new column needs a new file and Rocky has to run it before the deploy that uses it, or writes fail.
 
 Env vars on Vercel (Production): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (must be the service_role / `sb_secret_` key, the publishable key gives "violates row-level security"), `BAR_PIN`. Env changes need a redeploy to take effect.
 
 ## Product rules Rocky has set (don't undo)
 
 - Deliberately minimal: no tables, no "where am I", no per-guest order cap, no payments, no accounts, no email. Date doesn't matter.
-- Guests type a name once; the phone remembers it and a device id. Bartenders pick their name from the fixed list `BARTENDERS` in `BarApp.tsx`, never type it.
+- **Guests log in with just their name (2026-10-07).** `POST /api/guests/lookup` says if a name exists; `POST /api/guests/join` creates it or, with `takeover`, re-links it to this phone ("there's already a Sam here. is that you?" → yes). A different person with a taken name is prompted for a last-name initial and becomes "Sam B" (loops if that is taken too). Prefs and favourite live on the guest row (`PUT /api/guests/me`) with a localStorage cache; `/api/orders/mine?name=` matches orders case-insensitively by `guest_name`, so a new phone gets the drinks back too. The name page's "recent orders from this phone" still uses `?device_id=`. No passwords, deliberately: anyone can claim any name by saying "yes, that's me".
+- Bartenders pick their name from the fixed list `BARTENDERS` in `BarApp.tsx`, never type it.
 - **Menu tabs are fixed and in this order: Spirits, Cocktails, Beer & Wine** (`CATEGORIES`). Spirits is the default tab.
 - **Spirits are ordered as spirit + mixer.** Guest-facing base mixers (`MIXERS`): Rocks ("on the rocks"), Coke, Lemonade, Water, Ginger Beer. A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected.
-- **Flavour prefs (added later on 2026-10-06):** after the name, a "what's your flavour?" step with three slide toggles: coke fat/skinny, lemonade fat/skinny, water still/sparkling (fat = regular, skinny = diet). Stored on the phone (`aj_prefs`) and sent with every guest order; the server's `resolveMixer()` turns the base mixer into the exact pour and THAT is what `order_items.mixer` stores (Coke / Skinny Coke / Lemonade / Skinny Lemonade / Still Water / Sparkling Water). Bartenders' verbal-order chips are the resolved `MIXER_VARIANTS` directly. `src/cart.ts` has a client copy of resolveMixer for labels, keep the two in step. Older rows may still hold the pre-change mixers "Water (still)"/"Sparkling"; they render as-is.
+- **Flavour prefs (added 2026-10-06, moved server-side onto the guest row 2026-10-07):** after the name, a "what's your flavour?" step with three slide toggles: coke fat/skinny, lemonade fat/skinny, water still/sparkling (fat = regular, skinny = diet). Stored on the guest row with a phone cache (`aj_prefs`) and sent with every guest order; the server's `resolveMixer()` turns the base mixer into the exact pour and THAT is what `order_items.mixer` stores (Coke / Skinny Coke / Lemonade / Skinny Lemonade / Still Water / Sparkling Water). Bartenders' verbal-order chips are the resolved `MIXER_VARIANTS` directly. `src/cart.ts` has a client copy of resolveMixer for labels, keep the two in step. Older rows may still hold the pre-change mixers "Water (still)"/"Sparkling"; they render as-is.
 - **Favourite:** same step offers "add your favourite" (drink + mixer + pour for a spirit); stored on the phone (`aj_fav`, base mixer) and pinned at the top of the menu with an "add one" button and a "change favourite" link. Hidden if the drink was removed. "your flavour" link next to "not you?" reopens the step.
 - **Light / Stiff pour is spirits only** (Rocky corrected this mid-build: "no only spirits not cocktails"). One pour per spirit in an order; changing it moves every line of that spirit. Null = regular.
 - Pour chips appear only inside a spirit's panel after tapping "choose", never up front (Rocky's second correction). The bottom bar is a `+N` count chip (opens a review sheet with − / + per line) and a "complete order" button.
