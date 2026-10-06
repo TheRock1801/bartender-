@@ -31,7 +31,7 @@ npm run build   # type-check + production bundle
 
 ## Deploy (one-time, ~15 minutes)
 
-1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it, then `supabase_add_instructions.sql` and `supabase_spirits_migration.sql` (added later).
+1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it, then `supabase_add_instructions.sql`, `supabase_spirits_migration.sql` and `supabase_menu_additions.sql` (added later, in that order).
    Copy the project URL and the `service_role` key (Settings → API).
 2. **Vercel**: import this repo. Set env vars on Production:
    - `SUPABASE_URL`

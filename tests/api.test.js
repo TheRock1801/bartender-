@@ -28,7 +28,8 @@ async function call(path, { method = 'GET', body, pin } = {}) {
 test('menu is seeded with the two starting drinks and ordering open', async () => {
   const { status, body } = await call('/api/menu')
   assert.equal(status, 200)
-  assert.deepEqual(body.drinks.map((d) => d.name), ['Whiskey Old Fashioned', 'Bourbon', 'Speights', 'Red wine', 'White wine', 'Sparkling wine'])
+  assert.deepEqual(body.drinks.slice(0, 4).map((d) => d.name), ['Whiskey Old Fashioned', 'Limoncello Spritz', 'Paloma', 'Bourbon'])
+  assert.equal(body.drinks.filter((d) => d.category === 'Spirits').length, 7)
   assert.deepEqual(body.categories, ['Cocktails', 'Spirits', 'Beer & Wine'])
   assert.ok(body.mixers.includes('Ginger Beer'))
   assert.equal(body.settings.ordering_open, true)
@@ -42,7 +43,7 @@ test('bartender routes need the PIN', async () => {
 
 test('guest orders a couple of drinks, bartender claims, makes, delivers', async () => {
   const { drinks } = (await call('/api/menu')).body
-  const [of, bc] = drinks
+  const of = drinks.find((d) => d.name === 'Whiskey Old Fashioned'), bc = drinks.find((d) => d.name === 'Bourbon')
   const placed = await call('/api/orders', {
     method: 'POST',
     body: { guest_name: 'Sam', device_id: 'dev-1', items: [{ drink_id: of.id, qty: 2 }, { drink_id: bc.id, qty: 1, mixer: 'Coke' }, { drink_id: of.id, qty: 1 }] },
