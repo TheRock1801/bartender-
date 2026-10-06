@@ -90,7 +90,7 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setErr('')
-    try { await fn() } catch (e) { setErr(e instanceof Error ? e.message : 'That did not go through, try again') } finally { setBusy(false) }
+    try { await fn() } catch (e) { setErr(e instanceof Error ? e.message : "that didn't go through, give it another go") } finally { setBusy(false) }
   }
   // Try a name: new -> join straight away; taken -> ask.
   const tryName = (n: string) => run(async () => {
@@ -128,21 +128,21 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
           />
           <button className="btn-primary text-lg" disabled={!value.trim() || busy}>{busy ? 'one sec…' : "let's drink"}</button>
           {err && <p className="font-mono text-xs text-amber">{err}</p>}
-          <p className="text-sm text-cocoa/60">Your name is your login. Type it again on any phone and your drinks and favourite come back.</p>
+          <p className="text-sm text-cocoa/60">that's all you need. pop it in on any phone and we'll know it's you.</p>
         </form>
       ) : !taken.addInitial ? (
         <section className="w-full mt-10 flex flex-col gap-4 divider pt-6">
           <h2 className="display text-2xl">there's already a {taken.name} here.</h2>
-          <p className="text-sm text-cocoa/60">Is that you? Say yes and your drinks and favourite come back on this phone.</p>
+          <p className="text-sm text-cocoa/60">is that you?</p>
           <button className="btn-primary text-lg" disabled={busy} onClick={itsMe}>{busy ? 'one sec…' : "yes, that's me"}</button>
-          <button className="btn-soft" disabled={busy} onClick={() => setTaken({ ...taken, addInitial: true })}>no, I'm a different {taken.name}</button>
+          <button className="btn-soft" disabled={busy} onClick={() => setTaken({ ...taken, addInitial: true })}>nah, different {taken.name}</button>
           <button className="btn-ghost self-start px-0 font-mono text-xs lowercase" onClick={() => { setTaken(null); setErr('') }}>← back</button>
           {err && <p className="font-mono text-xs text-amber">{err}</p>}
         </section>
       ) : (
         <form onSubmit={withInitial} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
-          <label className="display text-2xl" htmlFor="guest-initial">add your last name initial.</label>
-          <p className="text-sm text-cocoa/60">So the bar can tell the two of you apart. You'll be "{taken.name} {initial.trim().slice(0, 1).toUpperCase() || '_'}".</p>
+          <label className="display text-2xl" htmlFor="guest-initial">chuck in your last initial.</label>
+          <p className="text-sm text-cocoa/60">so we don't mix you two up. you'll be {taken.name} {initial.trim().slice(0, 1).toUpperCase() || '_'}.</p>
           <input
             id="guest-initial"
             className="input uppercase tracking-widest"
@@ -169,8 +169,8 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
 
       <section className="w-full mt-10 divider pt-6">
         <h2 className="display text-2xl mb-3">on the menu tonight.</h2>
-        {!menu.data && !menu.error && <p className="text-cocoa/60">Loading the menu…</p>}
-        {menu.error && !menu.data && <p className="text-cocoa/60">Can't reach the bar right now.</p>}
+        {!menu.data && !menu.error && <p className="text-cocoa/60">one sec…</p>}
+        {menu.error && !menu.data && <p className="text-cocoa/60">can't reach the bar right now.</p>}
         {groups.map(([cat, list]) => (
           <div key={cat} className="mb-5">
             <h3 className="label mb-1">{cat.toLowerCase()}</h3>
@@ -179,13 +179,13 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
                 <div key={d.id} className={`row ${d.available ? '' : 'opacity-60'}`}>
                   <div className="font-semibold leading-tight">{d.name}</div>
                   {d.description && <div className="text-sm text-cocoa/60">{d.description}</div>}
-                  {!d.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">Run out, sorry</span>}
+                  {!d.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">all gone, sorry</span>}
                 </div>
               ))}
             </div>
           </div>
         ))}
-        {menu.data && groups.length === 0 && <p className="text-cocoa/60">The bartenders are still writing the list.</p>}
+        {menu.data && groups.length === 0 && <p className="text-cocoa/60">still stocking the bar, back soon.</p>}
       </section>
 
       <a href="/bar" className="btn-ghost mt-12 text-sm self-start px-0 font-mono lowercase">bartender login →</a>
@@ -220,7 +220,7 @@ function Flavour({ name, prefs, fav, onDone }: {
       <section className="mt-10 divider pt-6">
         <p className="eyebrow">hey {name}</p>
         <h2 className="display text-3xl mt-2">what's your flavour?</h2>
-        <p className="text-sm text-cocoa/60 mt-2">Set once, remembered on this phone. The bar pours it your way without asking.</p>
+        <p className="text-sm text-cocoa/60 mt-2">so we don't have to ask every time.</p>
 
         <div className="mt-6 flex flex-col gap-5">
           {(Object.keys(PREF_LABELS) as PrefKey[]).map((k) => (
@@ -238,7 +238,7 @@ function Flavour({ name, prefs, fav, onDone }: {
 
       <section className="mt-10 divider pt-6">
         <h2 className="display text-3xl">add your favourite.</h2>
-        <p className="text-sm text-cocoa/60 mt-2">It sits at the top of your menu for a one-tap order.</p>
+        <p className="text-sm text-cocoa/60 mt-2">your usual, one tap, top of the menu.</p>
 
         {favDraft && favDrink && !picking ? (
           <div className="card mt-5 flex items-center gap-3">
@@ -265,7 +265,7 @@ function Flavour({ name, prefs, fav, onDone }: {
 
       <div className="mt-10 flex flex-col gap-3">
         <button className="btn-primary text-lg" onClick={() => onDone(draft, favDraft)}>
-          {favDraft ? 'done, show me the menu' : 'skip the favourite, show me the menu'}
+          {favDraft ? 'sweet, show me the menu' : 'nah, just show me the menu'}
         </button>
       </div>
     </main>
@@ -427,10 +427,10 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
       setCart({})
       setReview(false)
       mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
-      flash('ok', 'Ordered! A bartender will find you.')
+      flash('ok', "on it! we'll find you.")
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
-      flash('err', e instanceof Error ? e.message : 'That did not go through, try again')
+      flash('err', e instanceof Error ? e.message : "that didn't go through, give it another go")
       menu.refresh()
     } finally {
       setBusy(false)
@@ -452,13 +452,13 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
       </p>
 
       {settings?.last_orders && (
-        <Banner tone="amber">Last orders! Get them in now.</Banner>
+        <Banner tone="amber">last orders! get 'em in.</Banner>
       )}
       {!open && (
-        <Banner tone="cocoa">The bar's paused ordering for a few minutes. Hang tight.</Banner>
+        <Banner tone="cocoa">bar's taking a breather, back in a few.</Banner>
       )}
       {menu.error && !menu.data && (
-        <Banner tone="cocoa">Can't reach the bar right now. Signal might be patchy, keep this page open.</Banner>
+        <Banner tone="cocoa">can't reach the bar right now, dodgy signal probably. hang about.</Banner>
       )}
 
       {fav && favDrink && (
@@ -467,7 +467,7 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
             <div className="flex-1 min-w-0">
               <p className="label">your favourite</p>
               <p className="font-display font-extrabold text-2xl tracking-tightest mt-1">{label(favDrink.name, fav.mixer, fav.strength)}</p>
-              {!favDrink.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">Run out, sorry</span>}
+              {!favDrink.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">all gone, sorry</span>}
             </div>
             <button
               className="btn-primary px-5"
@@ -492,7 +492,7 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
 
       <section className="mt-8 divider pt-5">
         <h2 className="display text-2xl mb-3">menu.</h2>
-        {!menu.data && !menu.error && <p className="text-cocoa/60">Loading the menu…</p>}
+        {!menu.data && !menu.error && <p className="text-cocoa/60">one sec…</p>}
 
         {tabs.length > 0 && (
           <div className="flex gap-6 border-b border-taupe/30 mb-5 overflow-x-auto">
@@ -512,7 +512,7 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
         {activeTab && (
           <>
             {activeTab === spiritsCategory && activeDrinks.length > 0 && (
-              <p className="font-mono text-xs text-cocoa/60 mb-3">pick a spirit, then what you'd like it with.</p>
+              <p className="font-mono text-xs text-cocoa/60 mb-3">pick a spirit, then what you want with it.</p>
             )}
             <DrinkRows
               key={activeTab}
@@ -565,11 +565,11 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
               <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={() => setReview(false)} aria-label="Close">×</button>
             </div>
             <CartSummary cart={cart} drinks={drinks} onBump={bump} label={label} title="" />
-            <p className="font-mono text-xs text-cocoa/60 mt-3">tap − to take something off. everything at zero disappears.</p>
+            <p className="font-mono text-xs text-cocoa/60 mt-3">tap − to drop one.</p>
             <div className="mt-5 flex gap-2">
               <button className="btn-soft" onClick={() => setReview(false)}>add more</button>
               <button className="btn-primary flex-1 text-lg" onClick={placeOrder} disabled={busy || count === 0 || !open}>
-                {busy ? 'sending…' : count === 0 ? 'nothing to order' : 'complete order'}
+                {busy ? 'sending…' : count === 0 ? 'nothing in here' : 'complete order'}
               </button>
             </div>
           </div>
@@ -592,11 +592,11 @@ function Banner({ tone, children }: { tone: 'amber' | 'cocoa'; children: React.R
 
 function GuestOrderCard({ order }: { order: Order }) {
   const label: Record<Order['status'], string> = {
-    new: 'Waiting for a bartender',
-    making: order.claimed_by ? `${order.claimed_by} is on it` : 'Being made',
-    ready: order.claimed_by ? `Ready, ${order.claimed_by} is bringing it over` : 'Ready, coming your way',
-    delivered: 'Delivered. Cheers!',
-    cancelled: 'Cancelled',
+    new: 'in the queue',
+    making: order.claimed_by ? `${order.claimed_by}'s on it` : 'being made',
+    ready: order.claimed_by ? `done, ${order.claimed_by}'s bringing it over` : 'done, coming your way',
+    delivered: 'sorted. cheers!',
+    cancelled: 'cancelled',
   }
   const tone: Record<Order['status'], string> = {
     new: 'bg-sand text-cocoa',

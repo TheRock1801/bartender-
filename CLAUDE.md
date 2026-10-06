@@ -51,7 +51,7 @@ tests/api.test.js   node:test, 10 tests
 - `settings`: key/value jsonb (`ordering_open`, `last_orders`)
 - `guests` (added 2026-10-07): id, name, name_key (unique, lowercased/trimmed), device_id (phone currently using it), prefs jsonb, favourite jsonb, timestamps. **A guest's name IS their account.**
 
-**Migrations, run manually in the Supabase SQL editor, in this order** (no migration runner; all idempotent): `supabase_schema.sql`, `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql`, `supabase_strength_migration.sql`, `supabase_guests_migration.sql`. **The first five were confirmed run by Rocky on 2026-10-06; the guests one was handed over 2026-10-07 and not yet confirmed.** A new column needs a new file and Rocky has to run it before the deploy that uses it, or writes fail.
+**Migrations, run manually in the Supabase SQL editor, in this order** (no migration runner; all idempotent): `supabase_schema.sql`, `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql`, `supabase_strength_migration.sql`, `supabase_guests_migration.sql`. **All six confirmed run by Rocky (first five 2026-10-06, guests 2026-10-07 after the live app showed "could not find the table public.guests").** A new column needs a new file and Rocky has to run it before the deploy that uses it, or writes fail.
 
 Env vars on Vercel (Production): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (must be the service_role / `sb_secret_` key, the publishable key gives "violates row-level security"), `BAR_PIN`. Env changes need a redeploy to take effect.
 

@@ -96,7 +96,7 @@ test('run-out drinks cannot be ordered by guests but can be recorded by a barten
 
   const guest = await call('/api/orders', { method: 'POST', body: { guest_name: 'Al', device_id: 'd2', items: [{ drink_id: bc.id }] } })
   assert.equal(guest.status, 400)
-  assert.match(guest.body.error, /run out/)
+  assert.match(guest.body.error, /all gone/)
 
   const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', items: [{ drink_id: bc.id }] } })
   assert.equal(verbal.status, 201)

@@ -118,7 +118,7 @@ export function CartSummary({ cart, drinks, onBump, label, title = 'your order' 
   title?: string
 }) {
   const lines = Object.values(cart).filter((l) => l.qty > 0)
-  if (!lines.length) return <p className="font-mono text-sm text-cocoa/60">nothing in your order yet.</p>
+  if (!lines.length) return <p className="font-mono text-sm text-cocoa/60">nothing in here yet.</p>
   const nameOf = (id: string) => drinks.find((d) => d.id === id)?.name ?? 'Drink'
   return (
     <div>

@@ -25,28 +25,28 @@ export function buildApp(store, { barPin }) {
   // A guest's base mixer (Coke / Lemonade / Water) is resolved with their flavour prefs;
   // a bartender can send the resolved variant directly.
   async function resolveItems(rawItems, { requireAvailable, prefs = {} }) {
-    if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'Pick at least one drink' }
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'pick something first' }
     const drinks = await store.listDrinks()
     const byId = new Map(drinks.map((d) => [d.id, d]))
     const merged = new Map()
     for (const it of rawItems) {
       const d = byId.get(it?.drink_id)
-      if (!d) return { error: 'One of those drinks is no longer on the menu' }
-      if (requireAvailable && !d.available) return { error: `${d.name} has run out, sorry` }
+      if (!d) return { error: "one of those just came off the menu, sorry" }
+      if (requireAvailable && !d.available) return { error: `${d.name}'s all gone, sorry` }
       const qty = Math.min(10, Math.max(1, Math.floor(Number(it.qty) || 1)))
       let mixer = null
       if (d.category === SPIRITS_CATEGORY) {
         mixer = str(it.mixer, 30)
         if (MIXERS.includes(mixer)) mixer = resolveMixer(mixer, prefs)
-        else if (!MIXER_VARIANTS.includes(mixer)) return { error: `Pick what to have your ${d.name} with` }
+        else if (!MIXER_VARIANTS.includes(mixer)) return { error: `what do you want with your ${d.name}?` }
       } else if (it.mixer) {
-        return { error: `${d.name} doesn't come with a mixer` }
+        return { error: `${d.name} doesn't take a mixer` }
       }
       let strength = null
       if (it.strength) {
         strength = str(it.strength, 10).toLowerCase()
-        if (!STRENGTHS.includes(strength)) return { error: 'Strength can be light or stiff' }
-        if (d.category !== SPIRITS_CATEGORY) return { error: 'Light or stiff is only for spirits' }
+        if (!STRENGTHS.includes(strength)) return { error: 'pour is light or stiff' }
+        if (d.category !== SPIRITS_CATEGORY) return { error: 'light or stiff is just for spirits' }
       }
       const key = d.id + '|' + (mixer || '') + '|' + (strength || '')
       merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, strength, qty: (merged.get(key)?.qty || 0) + qty })
@@ -64,7 +64,7 @@ export function buildApp(store, { barPin }) {
   app.post('/api/guests/lookup', async (req, res, next) => {
     try {
       const name = str(req.body?.name)
-      if (!name) return bad(res, 400, 'Tell us your name first')
+      if (!name) return bad(res, 400, 'need your name first')
       const g = await store.getGuest(name)
       res.json({ exists: !!g, name: g ? g.name : name })
     } catch (e) { next(e) }
@@ -74,7 +74,7 @@ export function buildApp(store, { barPin }) {
     try {
       const name = str(req.body?.name)
       const device_id = str(req.body?.device_id, 80)
-      if (!name) return bad(res, 400, 'Tell us your name first')
+      if (!name) return bad(res, 400, 'need your name first')
       if (!device_id) return bad(res, 400, 'Missing device id')
       const existing = await store.getGuest(name)
       if (existing && !req.body?.takeover) return res.status(409).json({ error: 'name_taken', name: existing.name })
@@ -120,10 +120,10 @@ export function buildApp(store, { barPin }) {
     try {
       const guest_name = str(req.body?.guest_name)
       const device_id = str(req.body?.device_id, 80)
-      if (!guest_name) return bad(res, 400, 'Tell us your name first')
+      if (!guest_name) return bad(res, 400, 'need your name first')
       if (!device_id) return bad(res, 400, 'Missing device id')
       const settings = await store.getSettings()
-      if (!settings.ordering_open) return bad(res, 409, 'The bar has paused ordering for a bit')
+      if (!settings.ordering_open) return bad(res, 409, "bar's taking a breather, try again in a few")
       const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true, prefs: normalisePrefs(req.body?.prefs) })
       if (error) return bad(res, 400, error)
       const order = await store.createOrder({ guest_name, device_id, items })
