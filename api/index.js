@@ -76,9 +76,12 @@ export function buildApp(store, { barPin }) {
   bar.get('/orders', async (req, res, next) => {
     try {
       const all = req.query.all === '1'
-      const orders = await store.listOrders(all ? {} : { statuses: OPEN_STATUSES })
-      const settings = await store.getSettings()
-      res.json({ orders, settings, now: new Date().toISOString() })
+      const [orders, settings, tally] = await Promise.all([
+        store.listOrders(all ? {} : { statuses: OPEN_STATUSES }),
+        store.getSettings(),
+        store.drinkTally(),
+      ])
+      res.json({ orders, settings, tally, now: new Date().toISOString() })
     } catch (e) { next(e) }
   })
 
@@ -147,6 +150,7 @@ export function buildApp(store, { barPin }) {
         description: str(req.body?.description, 120),
         category: str(req.body?.category, 30) || 'Cocktails',
         added_by: str(req.body?.added_by) || null,
+        instructions: str(req.body?.instructions, 2000),
       })
       res.status(201).json(drink)
     } catch (e) { next(e) }
@@ -158,10 +162,19 @@ export function buildApp(store, { barPin }) {
       if (typeof req.body?.available === 'boolean') patch.available = req.body.available
       if (typeof req.body?.name === 'string' && str(req.body.name)) patch.name = str(req.body.name)
       if (typeof req.body?.description === 'string') patch.description = str(req.body.description, 120)
+      if (typeof req.body?.instructions === 'string') patch.instructions = str(req.body.instructions, 2000)
       if (!Object.keys(patch).length) return bad(res, 400, 'Nothing to change')
       const drink = await store.updateDrink(req.params.id, patch)
       if (!drink) return bad(res, 404, 'Drink not found')
       res.json(drink)
+    } catch (e) { next(e) }
+  })
+
+  bar.delete('/drinks/:id', async (req, res, next) => {
+    try {
+      const ok = await store.deleteDrink(req.params.id)
+      if (!ok) return bad(res, 404, 'Drink not found')
+      res.json({ ok: true })
     } catch (e) { next(e) }
   })
 

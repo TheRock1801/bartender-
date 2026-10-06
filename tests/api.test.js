@@ -124,3 +124,30 @@ test('a bartender can add a drink and it shows on the guest menu immediately', a
   assert.equal(em.added_by, 'Rocky')
   assert.equal((await call('/api/bar/drinks', { method: 'POST', pin: PIN, body: { name: '  ' } })).status, 400)
 })
+
+test('drink instructions save on add and edit, tally counts non-cancelled orders, remove deletes', async () => {
+  const added = await call('/api/bar/drinks', { method: 'POST', pin: PIN, body: { name: 'Negroni', category: 'Cocktails', instructions: '1 gin\n1 campari\n1 sweet vermouth, stir' } })
+  assert.equal(added.status, 201)
+  assert.equal(added.body.instructions, '1 gin\n1 campari\n1 sweet vermouth, stir')
+
+  const edited = await call(`/api/bar/drinks/${added.body.id}`, { method: 'PATCH', pin: PIN, body: { instructions: 'Equal parts, stirred, orange peel' } })
+  assert.equal(edited.body.instructions, 'Equal parts, stirred, orange peel')
+
+  const o1 = await call('/api/orders', { method: 'POST', body: { guest_name: 'Tal', device_id: 'dev-t', items: [{ drink_id: added.body.id, qty: 2 }] } })
+  const o2 = await call('/api/orders', { method: 'POST', body: { guest_name: 'Tal', device_id: 'dev-t', items: [{ drink_id: added.body.id, qty: 5 }] } })
+  assert.equal(o1.status, 201)
+  await call(`/api/bar/orders/${o2.body.id}`, { method: 'PATCH', pin: PIN, body: { action: 'cancel', by: 'Rocky' } })
+  const queue = await call('/api/bar/orders', { pin: PIN })
+  assert.equal(queue.body.tally[added.body.id], 2)
+
+  const removed = await call(`/api/bar/drinks/${added.body.id}`, { method: 'DELETE', pin: PIN })
+  assert.equal(removed.status, 200)
+  assert.equal((await call(`/api/bar/drinks/${added.body.id}`, { method: 'DELETE', pin: PIN })).status, 404)
+  const menu = await call('/api/menu')
+  assert.ok(!menu.body.drinks.some((d) => d.id === added.body.id))
+  // the past order still names the drink
+  const all = await call('/api/bar/orders?all=1', { pin: PIN })
+  const past = all.body.orders.find((o) => o.id === o1.body.id)
+  assert.equal(past.items[0].drink_name, 'Negroni')
+  assert.equal(past.items[0].drink_id, null)
+})

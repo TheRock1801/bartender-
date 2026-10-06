@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, groupByCategory, minutesAgo, store, stored, type CartLine, type Drink, type Order, type Settings } from './api'
+import { api, groupByCategory, minutesAgo, store, stored, type CartLine, type Drink, type Order, type Settings, type Tally } from './api'
 import { usePoll } from './usePoll'
 
 const PIN_KEY = 'aj_bar_pin'
@@ -68,6 +68,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const queue = usePoll(() => api.bar.orders(pin), 4000, [pin])
   const menu = usePoll(api.menu, 15000)
   const [toast, setToast] = useState('')
+  const [openDrinkId, setOpenDrinkId] = useState<string | null>(null)
   const flash = (t: string) => { setToast(t); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
@@ -77,7 +78,9 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const orders = queue.data?.orders ?? []
   const settings = queue.data?.settings
   const drinks = menu.data?.drinks ?? []
+  const tally = queue.data?.tally ?? {}
   const newCount = orders.filter((o) => o.status === 'new').length
+  const openDrink = openDrinkId ? drinks.find((d) => d.id === openDrinkId) ?? null : null
 
   useNewOrderChime(orders)
 
@@ -122,9 +125,9 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
       {queue.error && <p className="mx-4 mt-3 rounded-xl bg-red-100 text-red-800 px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing last known queue.</p>}
 
       <div className="px-4 mt-4">
-        {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} />}
+        {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
         {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
-        {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} onChange={() => menu.refresh()} onError={flash} />}
+        {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
       <nav className="fixed bottom-0 inset-x-0 bg-cream/95 backdrop-blur border-t border-cocoa/10">
@@ -134,6 +137,18 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
           <TabBtn active={tab === 'menu'} onClick={() => setTab('menu')}>Menu</TabBtn>
         </div>
       </nav>
+
+      {openDrink && (
+        <DrinkSheet
+          pin={pin}
+          drink={openDrink}
+          ordered={tally[openDrink.id] || 0}
+          onClose={() => setOpenDrinkId(null)}
+          onChange={() => menu.refresh()}
+          onRemoved={() => { setOpenDrinkId(null); menu.refresh(); flash(`Removed ${openDrink.name}`) }}
+          onError={flash}
+        />
+      )}
 
       {toast && <div className="fixed top-4 inset-x-4 mx-auto max-w-md rounded-xl bg-cocoa text-cream px-4 py-3 text-center font-semibold shadow-lg">{toast}</div>}
     </main>
@@ -158,7 +173,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 // ---- Queue ----
 
-function Queue({ orders, me, now, act, loading }: { orders: Order[]; me: string; now?: string; act: (o: Order, a: string) => void; loading: boolean }) {
+function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]; me: string; now?: string; act: (o: Order, a: string) => void; loading: boolean; onShowDrink: (id: string) => void }) {
   const nowMs = now ? new Date(now).getTime() : Date.now()
   const open = orders.filter((o) => ['new', 'making', 'ready'].includes(o.status))
   const grabs = open.filter((o) => o.status === 'new')
@@ -172,7 +187,7 @@ function Queue({ orders, me, now, act, loading }: { orders: Order[]; me: string;
     <div className="flex flex-col gap-6">
       <Section title={`Up for grabs (${grabs.length})`} empty="All claimed">
         {grabs.map((o) => (
-          <OrderCard key={o.id} order={o} nowMs={nowMs}>
+          <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
             <button className="btn-amber flex-1" onClick={() => act(o, 'claim')}>I've got it</button>
             <button className="btn-ghost" onClick={() => act(o, 'cancel')}>Cancel</button>
           </OrderCard>
@@ -180,7 +195,7 @@ function Queue({ orders, me, now, act, loading }: { orders: Order[]; me: string;
       </Section>
       <Section title={`Mine (${mine.length})`} empty="Nothing on the go">
         {mine.map((o) => (
-          <OrderCard key={o.id} order={o} nowMs={nowMs}>
+          <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
             {o.status === 'making' && <button className="btn-primary flex-1" onClick={() => act(o, 'ready')}>Made it</button>}
             {o.status === 'ready' && <button className="btn-primary flex-1 !bg-sage" onClick={() => act(o, 'delivered')}>Delivered</button>}
             {o.status === 'making' && <button className="btn-ghost" onClick={() => act(o, 'unclaim')}>Put back</button>}
@@ -191,7 +206,7 @@ function Queue({ orders, me, now, act, loading }: { orders: Order[]; me: string;
       {others.length > 0 && (
         <Section title={`Others are on it (${others.length})`} empty="">
           {others.map((o) => (
-            <OrderCard key={o.id} order={o} nowMs={nowMs} muted>
+            <OrderCard key={o.id} order={o} nowMs={nowMs} muted onShowDrink={onShowDrink}>
               {o.status === 'ready' && <button className="btn-soft flex-1" onClick={() => act(o, 'delivered')}>I delivered it</button>}
             </OrderCard>
           ))}
@@ -212,7 +227,7 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
   )
 }
 
-function OrderCard({ order, nowMs, muted, children }: { order: Order; nowMs: number; muted?: boolean; children: React.ReactNode }) {
+function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Order; nowMs: number; muted?: boolean; children: React.ReactNode; onShowDrink: (id: string) => void }) {
   const mins = minutesAgo(order.created_at, nowMs)
   const late = mins >= 10 && order.status !== 'ready'
   return (
@@ -223,7 +238,12 @@ function OrderCard({ order, nowMs, muted, children }: { order: Order; nowMs: num
       </div>
       <ul className="mt-1.5 text-lg">
         {order.items.map((i) => (
-          <li key={i.id}><span className="font-semibold">{i.qty}×</span> {i.drink_name}</li>
+          <li key={i.id}>
+            <span className="font-semibold">{i.qty}×</span>{' '}
+            {i.drink_id ? (
+              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{i.drink_name}</button>
+            ) : i.drink_name}
+          </li>
         ))}
       </ul>
       <div className="mt-1 text-xs text-cocoa/50">
@@ -294,21 +314,19 @@ function NewOrder({ pin, me, drinks, onPlaced, onError }: { pin: string; me: str
 
 // ---- Menu management ----
 
-function MenuManager({ pin, me, drinks, onChange, onError }: { pin: string; me: string; drinks: Drink[]; onChange: () => void; onError: (m: string) => void }) {
+function MenuManager({ pin, me, drinks, tally, onChange, onError, onShowDrink }: { pin: string; me: string; drinks: Drink[]; tally: Tally; onChange: () => void; onError: (m: string) => void; onShowDrink: (id: string) => void }) {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
+  const [instructions, setInstructions] = useState('')
   const [cat, setCat] = useState('Cocktails')
   const [busy, setBusy] = useState(false)
   const cats = [...new Set(['Cocktails', 'Mixers', 'Beer & Wine', 'Soft', ...drinks.map((d) => d.category)])]
 
-  const toggle = async (d: Drink) => {
-    try { await api.bar.updateDrink(pin, d.id, { available: !d.available }); onChange() } catch (e) { onError(e instanceof Error ? e.message : 'Did not save') }
-  }
   const add = async () => {
     setBusy(true)
     try {
-      await api.bar.addDrink(pin, { name: name.trim(), description: desc.trim(), category: cat, added_by: me })
-      setName(''); setDesc('')
+      await api.bar.addDrink(pin, { name: name.trim(), description: desc.trim(), category: cat, added_by: me, instructions: instructions.trim() })
+      setName(''); setDesc(''); setInstructions('')
       onChange()
     } catch (e) { onError(e instanceof Error ? e.message : 'Did not save') } finally { setBusy(false) }
   }
@@ -319,6 +337,13 @@ function MenuManager({ pin, me, drinks, onChange, onError }: { pin: string; me: 
         <h2 className="font-semibold">Add a drink</h2>
         <input className="input" placeholder="Name (e.g. Espresso Martini)" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="What's in it (optional)" value={desc} maxLength={120} onChange={(e) => setDesc(e.target.value)} />
+        <textarea
+          className="input min-h-[7rem] text-base"
+          placeholder={"How to make it (optional)\ne.g. 50ml bourbon, sugar cube, 2 dashes bitters. Stir over ice, orange peel."}
+          value={instructions}
+          maxLength={2000}
+          onChange={(e) => setInstructions(e.target.value)}
+        />
         <div className="flex gap-2 flex-wrap">
           {cats.map((c) => (
             <button key={c} onClick={() => setCat(c)} className={`pill !py-1.5 !px-3 ring-1 ${cat === c ? 'bg-cocoa text-cream ring-cocoa' : 'bg-white ring-cocoa/15'}`}>{c}</button>
@@ -328,19 +353,103 @@ function MenuManager({ pin, me, drinks, onChange, onError }: { pin: string; me: 
       </section>
 
       <section>
-        <h2 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">On the menu · tap to mark run out</h2>
+        <h2 className="uppercase tracking-widest text-xs text-cocoa/60 mb-2">On the menu · tap a drink for the recipe</h2>
         <div className="flex flex-col gap-1.5">
           {drinks.map((d) => (
-            <button key={d.id} onClick={() => toggle(d)} className={`text-left flex items-center gap-3 rounded-xl ring-1 px-3 py-2.5 ${d.available ? 'bg-white/70 ring-cocoa/10' : 'bg-cocoa/5 ring-cocoa/10 opacity-70'}`}>
-              <div className="flex-1">
+            <button key={d.id} onClick={() => onShowDrink(d.id)} className={`text-left flex items-center gap-3 rounded-xl ring-1 px-3 py-2.5 ${d.available ? 'bg-white/70 ring-cocoa/10' : 'bg-cocoa/5 ring-cocoa/10 opacity-70'}`}>
+              <div className="flex-1 min-w-0">
                 <div className="font-semibold">{d.name}</div>
-                <div className="text-xs text-cocoa/50">{d.category}{d.description && ` · ${d.description}`}{d.added_by && ` · added by ${d.added_by}`}</div>
+                <div className="text-xs text-cocoa/50">{d.category}{d.description && ` · ${d.description}`}{!d.instructions && ' · no recipe yet'}</div>
               </div>
+              <span className="pill bg-cocoa/10 text-cocoa/70" title="Ordered tonight">{tally[d.id] || 0} ordered</span>
               <span className={`pill ${d.available ? 'bg-sage/20 text-sage' : 'bg-cocoa/10 text-cocoa/70'}`}>{d.available ? 'Available' : 'Run out'}</span>
             </button>
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+// ---- Drink recipe sheet ----
+
+function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError }: {
+  pin: string; drink: Drink; ordered: number; onClose: () => void; onChange: () => void; onRemoved: () => void; onError: (m: string) => void
+}) {
+  const [editing, setEditing] = useState(!drink.instructions)
+  const [text, setText] = useState(drink.instructions)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true)
+    try { await fn() } catch (e) { onError(e instanceof Error ? e.message : 'Did not save') } finally { setBusy(false) }
+  }
+  const save = () => run(async () => { await api.bar.updateDrink(pin, drink.id, { instructions: text.trim() }); setEditing(false); onChange() })
+  const toggle = () => run(async () => { await api.bar.updateDrink(pin, drink.id, { available: !drink.available }); onChange() })
+  const remove = () => run(async () => { await api.bar.removeDrink(pin, drink.id); onRemoved() })
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={drink.name}>
+      <button className="absolute inset-0 bg-cocoa/40" onClick={onClose} aria-label="Close" />
+      <div className="relative w-full max-w-lg bg-cream rounded-t-3xl sm:rounded-3xl shadow-xl p-5 pb-8 max-h-[90dvh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-display text-2xl leading-tight">{drink.name}</h2>
+            <p className="text-sm text-cocoa/60 mt-0.5">{drink.category}{drink.description && ` · ${drink.description}`}</p>
+          </div>
+          <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <div className="mt-4 flex gap-2 flex-wrap">
+          <span className="pill bg-amber/20 text-amber !text-sm !px-3 !py-1">{ordered} ordered tonight</span>
+          <span className={`pill !text-sm !px-3 !py-1 ${drink.available ? 'bg-sage/20 text-sage' : 'bg-cocoa/10 text-cocoa/70'}`}>{drink.available ? 'Available' : 'Run out'}</span>
+        </div>
+
+        <section className="mt-5">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="uppercase tracking-widest text-xs text-cocoa/60">How to make it</h3>
+            {!editing && <button className="btn-ghost !py-0 text-sm" onClick={() => setEditing(true)}>Edit</button>}
+          </div>
+          {editing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                className="input min-h-[9rem] text-base"
+                autoFocus
+                placeholder={"Measures, method, glass, garnish.\ne.g. 50ml bourbon, sugar cube, 2 dashes bitters. Stir over ice, orange peel."}
+                value={text}
+                maxLength={2000}
+                onChange={(e) => setText(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <button className="btn-primary flex-1" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save recipe'}</button>
+                {drink.instructions && <button className="btn-ghost" onClick={() => { setText(drink.instructions); setEditing(false) }}>Cancel</button>}
+              </div>
+            </div>
+          ) : (
+            <p className="card whitespace-pre-wrap text-lg leading-relaxed">{drink.instructions}</p>
+          )}
+        </section>
+
+        <div className="mt-6 flex gap-2 items-center">
+          <button className="btn-soft flex-1" disabled={busy} onClick={toggle}>{drink.available ? 'Mark run out' : 'Back on the menu'}</button>
+          {confirmRemove ? (
+            <>
+              <button className="btn-primary !bg-red-700" disabled={busy} onClick={remove}>{busy ? 'Removing…' : 'Yes, remove'}</button>
+              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>Keep</button>
+            </>
+          ) : (
+            <button className="btn-ghost text-red-700" onClick={() => setConfirmRemove(true)}>Remove</button>
+          )}
+        </div>
+        {confirmRemove && <p className="text-xs text-cocoa/60 mt-2">Takes it off the menu for good. Past orders keep the name.</p>}
+      </div>
     </div>
   )
 }

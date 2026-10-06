@@ -6,6 +6,7 @@ export type Drink = {
   available: boolean
   sort: number
   added_by: string | null
+  instructions: string
 }
 
 export type OrderItem = { id: string; drink_id: string | null; drink_name: string; qty: number }
@@ -25,6 +26,9 @@ export type Order = {
 }
 
 export type Settings = { ordering_open: boolean; last_orders: boolean }
+
+// drink id -> how many ordered tonight (cancelled orders excluded)
+export type Tally = Record<string, number>
 
 export type CartLine = { drink_id: string; qty: number }
 
@@ -55,15 +59,17 @@ export const api = {
   bar: {
     login: (pin: string) => req<{ ok: true }>('/api/bar/login', { method: 'POST' }, pin),
     orders: (pin: string, all = false) =>
-      req<{ orders: Order[]; settings: Settings; now: string }>(`/api/bar/orders${all ? '?all=1' : ''}`, {}, pin),
+      req<{ orders: Order[]; settings: Settings; tally: Tally; now: string }>(`/api/bar/orders${all ? '?all=1' : ''}`, {}, pin),
     placeOrder: (pin: string, guest_name: string, placed_by: string, items: CartLine[]) =>
       req<Order>('/api/bar/orders', { method: 'POST', body: json({ guest_name, placed_by, items }) }, pin),
     act: (pin: string, id: string, action: string, by: string) =>
       req<Order>(`/api/bar/orders/${id}`, { method: 'PATCH', body: json({ action, by }) }, pin),
-    addDrink: (pin: string, drink: { name: string; description: string; category: string; added_by: string }) =>
+    addDrink: (pin: string, drink: { name: string; description: string; category: string; added_by: string; instructions: string }) =>
       req<Drink>('/api/bar/drinks', { method: 'POST', body: json(drink) }, pin),
-    updateDrink: (pin: string, id: string, patch: Partial<Pick<Drink, 'available' | 'name' | 'description'>>) =>
+    updateDrink: (pin: string, id: string, patch: Partial<Pick<Drink, 'available' | 'name' | 'description' | 'instructions'>>) =>
       req<Drink>(`/api/bar/drinks/${id}`, { method: 'PATCH', body: json(patch) }, pin),
+    removeDrink: (pin: string, id: string) =>
+      req<{ ok: true }>(`/api/bar/drinks/${id}`, { method: 'DELETE' }, pin),
     settings: (pin: string, patch: Partial<Settings>) =>
       req<Settings>('/api/bar/settings', { method: 'PATCH', body: json(patch) }, pin),
   },

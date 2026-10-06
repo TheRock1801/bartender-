@@ -31,7 +31,7 @@ npm run build   # type-check + production bundle
 
 ## Deploy (one-time, ~15 minutes)
 
-1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it.
+1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it, then `supabase_add_instructions.sql` (added later, one column).
    Copy the project URL and the `service_role` key (Settings → API).
 2. **Vercel**: import this repo. Set env vars on Production:
    - `SUPABASE_URL`
@@ -45,7 +45,8 @@ npm run build   # type-check + production bundle
 - Tap the bell on the bar screen once so your phone chimes on new orders (browsers need a tap before they'll play sound).
 - "Pause ordering" when the queue gets silly. Guests see a banner and the order button goes away.
 - "Call last orders" puts a banner on every guest's phone. Ordering stays open until you pause it.
-- Run out of something: Menu tab, tap the drink. Guests see "Run out, sorry" straight away.
+- Tap any drink (Menu tab, or a drink name in the queue) for its recipe. Edit the steps there, mark it run out, see how many have been ordered tonight, or remove it from the menu.
+- Run out of something: tap the drink, then "Mark run out". Guests see "Run out, sorry" straight away.
 - Someone asks you for a drink while you're walking around: "+ Order" tab, their name, the drinks, done. It lands in the queue for whoever's at the bar.
 - Wi-Fi drops: the app keeps polling and shows the last known queue. Nothing is lost server-side.
 
