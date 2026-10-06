@@ -55,7 +55,7 @@ test('guest orders a couple of drinks, bartender claims, makes, delivers', async
   // duplicate lines are merged
   assert.deepEqual(placed.body.items.map((i) => [i.drink_name, i.mixer, i.qty]), [['Whiskey Old Fashioned', null, 3], ['Bourbon', 'Coke', 1]])
 
-  const mine = await call('/api/orders/mine?device_id=dev-1')
+  const mine = await call('/api/orders/mine?name=sam')
   assert.equal(mine.body.orders.length, 1)
 
   const queue = await call('/api/bar/orders', { pin: PIN })
@@ -232,4 +232,42 @@ test('flavour prefs resolve Coke / Lemonade / Water into the exact mixer; barten
   assert.equal(verbal.body.items[0].mixer, 'Skinny Lemonade')
 
   assert.equal((await order([{ drink_id: bourbon.id, mixer: 'Milk' }])).status, 400)
+})
+
+test('guests are their name: join, taken-name 409, takeover brings prefs/favourite back on a new phone', async () => {
+  const lookup1 = await call('/api/guests/lookup', { method: 'POST', body: { name: 'Jess' } })
+  assert.deepEqual(lookup1.body, { exists: false, name: 'Jess' })
+
+  const joined = await call('/api/guests/join', { method: 'POST', body: { name: 'Jess', device_id: 'phone-1' } })
+  assert.equal(joined.status, 201)
+  assert.deepEqual(joined.body, { name: 'Jess', prefs: null, favourite: null })
+
+  const saved = await call('/api/guests/me', { method: 'PUT', body: { name: 'jess', prefs: { coke: 'skinny', water: 'sparkling', lemonade: 'nope' }, favourite: { drink_id: 'abc', mixer: 'Coke', strength: 'stiff' } } })
+  assert.deepEqual(saved.body.prefs, { coke: 'skinny', water: 'sparkling' })
+  assert.deepEqual(saved.body.favourite, { drink_id: 'abc', mixer: 'Coke', strength: 'stiff' })
+
+  // same name, different phone, no takeover: taken
+  const taken = await call('/api/guests/join', { method: 'POST', body: { name: ' JESS ', device_id: 'phone-2' } })
+  assert.equal(taken.status, 409)
+  assert.equal(taken.body.error, 'name_taken')
+  assert.equal(taken.body.name, 'Jess')
+  assert.equal((await call('/api/guests/lookup', { method: 'POST', body: { name: 'jess' } })).body.exists, true)
+
+  // "yes that's me" on the new phone gets everything back
+  const back = await call('/api/guests/join', { method: 'POST', body: { name: 'jess', device_id: 'phone-2', takeover: true } })
+  assert.equal(back.status, 200)
+  assert.equal(back.body.name, 'Jess')
+  assert.deepEqual(back.body.prefs, { coke: 'skinny', water: 'sparkling' })
+
+  // a different Jess adds an initial and is a separate guest
+  const other = await call('/api/guests/join', { method: 'POST', body: { name: 'Jess B', device_id: 'phone-3' } })
+  assert.equal(other.status, 201)
+
+  // orders follow the name, not the phone
+  const { drinks } = (await call('/api/menu')).body
+  const paloma = drinks.find((d) => d.name === 'Paloma')
+  await call('/api/orders', { method: 'POST', body: { guest_name: 'Jess', device_id: 'phone-2', items: [{ drink_id: paloma.id }] } })
+  const mine = await call('/api/orders/mine?name=JESS')
+  assert.equal(mine.body.orders.length, 1)
+  assert.equal((await call('/api/orders/mine?name=Jess%20B')).body.orders.length, 0)
 })

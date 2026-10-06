@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { api, deviceId, minutesAgo, store, stored, storeJson, storedJson, type Drink, type Favourite, type MenuPayload, type Order, type PrefKey, type Prefs, type Strength } from './api'
+import { useEffect, useMemo, useState } from 'react'
+import { api, deviceId, minutesAgo, store, stored, storeJson, storedJson, type Drink, type Favourite, type Guest, type MenuPayload, type Order, type PrefKey, type Prefs, type Strength } from './api'
 import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, resolveMixer, setStrength, type Cart } from './cart'
 import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
@@ -8,13 +8,37 @@ const NAME_KEY = 'aj_guest_name'
 const PREFS_KEY = 'aj_prefs'
 const FAV_KEY = 'aj_fav'
 
+const DEFAULT_PREFS: Prefs = { coke: 'fat', lemonade: 'fat', water: 'still' }
+const fullPrefs = (p: Partial<Prefs> | null | undefined): Prefs | null => (p ? { ...DEFAULT_PREFS, ...p } : null)
+
 export default function GuestApp() {
+  const device = useMemo(deviceId, [])
   const [name, setName] = useState(() => stored(NAME_KEY))
+  // The phone keeps a copy for instant load; the server copy (keyed by name) wins when it answers.
   const [prefs, setPrefs] = useState<Prefs | null>(() => storedJson<Prefs>(PREFS_KEY))
   const [fav, setFav] = useState<Favourite | null>(() => storedJson<Favourite>(FAV_KEY))
   const [editingFlavour, setEditingFlavour] = useState(false)
 
-  if (!name) return <Join onJoin={(n) => { store(NAME_KEY, n); setName(n) }} />
+  const applyGuest = (gst: Guest) => {
+    store(NAME_KEY, gst.name); setName(gst.name)
+    const p = fullPrefs(gst.prefs)
+    storeJson(PREFS_KEY, p); setPrefs(p)
+    storeJson(FAV_KEY, gst.favourite); setFav(gst.favourite)
+  }
+
+  // Returning phone: refresh from the server. A name that predates the guest registry is registered now.
+  useEffect(() => {
+    if (!name) return
+    let alive = true
+    api.guests.me(name)
+      .catch((e: Error & { status?: number }) => (e.status === 404 ? api.guests.join(name, device, true) : Promise.reject(e)))
+      .then((gst) => { if (alive) applyGuest(gst) })
+      .catch(() => { /* offline: keep the phone's copy */ })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name])
+
+  if (!name) return <Join device={device} onJoin={applyGuest} />
   if (!prefs || editingFlavour) {
     return (
       <Flavour
@@ -25,6 +49,7 @@ export default function GuestApp() {
           storeJson(PREFS_KEY, p); setPrefs(p)
           storeJson(FAV_KEY, f); setFav(f)
           setEditingFlavour(false)
+          api.guests.save(name, { prefs: p, favourite: f }).catch(() => { /* phone copy still applies */ })
         }}
       />
     )
@@ -51,37 +76,87 @@ function Header() {
 
 // ---- Step 1: name ----
 
-function Join({ onJoin }: { onJoin: (name: string) => void }) {
+function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => void }) {
   const [value, setValue] = useState('')
-  const device = useMemo(deviceId, [])
+  const [initial, setInitial] = useState('')
+  // taken: a guest with this name already exists. Either it's them (logged out, new phone) or another person.
+  const [taken, setTaken] = useState<{ name: string; addInitial: boolean } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const menu = usePoll(api.menu, 30000)
-  const mine = usePoll(() => api.myOrders(device), 15000, [device])
+  const mine = usePoll(() => api.ordersFromDevice(device), 15000, [device])
   const groups = groupByTab(menu.data?.drinks ?? [], menu.data?.categories ?? []).filter(([, list]) => list.length)
   const recent = (mine.data?.orders ?? []).slice(0, 5)
 
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true); setErr('')
+    try { await fn() } catch (e) { setErr(e instanceof Error ? e.message : 'That did not go through, try again') } finally { setBusy(false) }
+  }
+  // Try a name: new -> join straight away; taken -> ask.
+  const tryName = (n: string) => run(async () => {
+    const found = await api.guests.lookup(n)
+    if (found.exists) { setTaken({ name: found.name, addInitial: false }); return }
+    onJoin(await api.guests.join(n, device))
+  })
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const n = value.trim()
-    if (n) onJoin(n)
+    if (n) tryName(n)
   }
+  const itsMe = () => taken && run(async () => onJoin(await api.guests.join(taken.name, device, true)))
+  const withInitial = (e: React.FormEvent) => {
+    e.preventDefault()
+    const i = initial.trim().replace(/[^a-z]/gi, '').slice(0, 1).toUpperCase()
+    if (taken && i) tryName(`${taken.name} ${i}`)
+  }
+
   return (
     <main className="min-h-dvh flex flex-col px-6 pt-12 pb-12 max-w-lg mx-auto">
       <Header />
-      <form onSubmit={submit} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
-        <label className="display text-2xl" htmlFor="guest-name">what's your name?</label>
-        <input
-          id="guest-name"
-          className="input"
-          autoFocus
-          autoComplete="given-name"
-          placeholder="e.g. Sam"
-          value={value}
-          maxLength={60}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <button className="btn-primary text-lg" disabled={!value.trim()}>let's drink</button>
-        <p className="text-sm text-cocoa/60">So the bartenders know whose drink is whose. Your phone remembers it.</p>
-      </form>
+      {!taken ? (
+        <form onSubmit={submit} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
+          <label className="display text-2xl" htmlFor="guest-name">what's your name?</label>
+          <input
+            id="guest-name"
+            className="input"
+            autoFocus
+            autoComplete="given-name"
+            placeholder="e.g. Sam"
+            value={value}
+            maxLength={60}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <button className="btn-primary text-lg" disabled={!value.trim() || busy}>{busy ? 'one sec…' : "let's drink"}</button>
+          {err && <p className="font-mono text-xs text-amber">{err}</p>}
+          <p className="text-sm text-cocoa/60">Your name is your login. Type it again on any phone and your drinks and favourite come back.</p>
+        </form>
+      ) : !taken.addInitial ? (
+        <section className="w-full mt-10 flex flex-col gap-4 divider pt-6">
+          <h2 className="display text-2xl">there's already a {taken.name} here.</h2>
+          <p className="text-sm text-cocoa/60">Is that you? Say yes and your drinks and favourite come back on this phone.</p>
+          <button className="btn-primary text-lg" disabled={busy} onClick={itsMe}>{busy ? 'one sec…' : "yes, that's me"}</button>
+          <button className="btn-soft" disabled={busy} onClick={() => setTaken({ ...taken, addInitial: true })}>no, I'm a different {taken.name}</button>
+          <button className="btn-ghost self-start px-0 font-mono text-xs lowercase" onClick={() => { setTaken(null); setErr('') }}>← back</button>
+          {err && <p className="font-mono text-xs text-amber">{err}</p>}
+        </section>
+      ) : (
+        <form onSubmit={withInitial} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
+          <label className="display text-2xl" htmlFor="guest-initial">add your last name initial.</label>
+          <p className="text-sm text-cocoa/60">So the bar can tell the two of you apart. You'll be "{taken.name} {initial.trim().slice(0, 1).toUpperCase() || '_'}".</p>
+          <input
+            id="guest-initial"
+            className="input uppercase tracking-widest"
+            autoFocus
+            placeholder="B"
+            value={initial}
+            maxLength={1}
+            onChange={(e) => setInitial(e.target.value)}
+          />
+          <button className="btn-primary text-lg" disabled={!initial.trim() || busy}>{busy ? 'one sec…' : "let's drink"}</button>
+          <button type="button" className="btn-ghost self-start px-0 font-mono text-xs lowercase" onClick={() => { setTaken({ ...taken, addInitial: false }); setErr('') }}>← back</button>
+          {err && <p className="font-mono text-xs text-amber">{err}</p>}
+        </form>
+      )}
 
       {recent.length > 0 && (
         <section className="w-full mt-10 divider pt-6">
@@ -308,7 +383,7 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
 }) {
   const device = useMemo(deviceId, [])
   const menu = usePoll(api.menu, 15000)
-  const mine = usePoll(() => api.myOrders(device), 5000, [device])
+  const mine = usePoll(() => api.myOrders(name), 5000, [name])
   const [cart, setCart] = useState<Cart>({})
   const [tab, setTab] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -371,7 +446,7 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
       <Header />
       <p className="mt-4 font-mono text-sm text-cocoa/70">
         hey {name}.{' '}
-        <button className="underline underline-offset-4" onClick={onChangeName}>not you?</button>
+        <button className="underline underline-offset-4" onClick={onChangeName}>log out</button>
         {' · '}
         <button className="underline underline-offset-4" onClick={onEditFlavour}>your flavour</button>
       </p>

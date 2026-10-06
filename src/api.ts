@@ -40,6 +40,9 @@ export type PrefKey = keyof Prefs
 // A guest's pinned favourite. mixer is the BASE mixer (Coke, not Skinny Coke).
 export type Favourite = { drink_id: string; mixer: string | null; strength: Strength | null }
 
+// A guest as the server knows them: their name is their account.
+export type Guest = { name: string; prefs: Partial<Prefs> | null; favourite: Favourite | null }
+
 export type MenuPayload = {
   drinks: Drink[]
   settings: Settings
@@ -73,8 +76,19 @@ export const api = {
   menu: () => req<MenuPayload>('/api/menu'),
   placeOrder: (guest_name: string, device_id: string, items: CartLine[], prefs: Partial<Prefs>) =>
     req<Order>('/api/orders', { method: 'POST', body: json({ guest_name, device_id, items, prefs }) }),
-  myOrders: (device_id: string) =>
+  myOrders: (name: string) =>
+    req<{ orders: Order[] }>(`/api/orders/mine?name=${encodeURIComponent(name)}`),
+  ordersFromDevice: (device_id: string) =>
     req<{ orders: Order[] }>(`/api/orders/mine?device_id=${encodeURIComponent(device_id)}`),
+
+  guests: {
+    lookup: (name: string) => req<{ exists: boolean; name: string }>('/api/guests/lookup', { method: 'POST', body: json({ name }) }),
+    join: (name: string, device_id: string, takeover = false) =>
+      req<Guest>('/api/guests/join', { method: 'POST', body: json({ name, device_id, takeover }) }),
+    me: (name: string) => req<Guest>(`/api/guests/me?name=${encodeURIComponent(name)}`),
+    save: (name: string, patch: { prefs?: Prefs | null; favourite?: Favourite | null }) =>
+      req<Guest>('/api/guests/me', { method: 'PUT', body: json({ name, ...patch }) }),
+  },
 
   bar: {
     login: (pin: string) => req<{ ok: true }>('/api/bar/login', { method: 'POST' }, pin),

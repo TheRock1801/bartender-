@@ -56,6 +56,62 @@ export function buildApp(store, { barPin }) {
 
   // ---- Guest routes (no auth) ----
 
+  // Guests are their name. Lookup says whether a name is taken; join creates it or, with
+  // takeover, re-links an existing name to this phone (logged out, new phone). A different
+  // person with the same first name is expected to add a last-name initial client-side.
+  const publicGuest = (g) => ({ name: g.name, prefs: g.prefs || null, favourite: g.favourite || null })
+
+  app.post('/api/guests/lookup', async (req, res, next) => {
+    try {
+      const name = str(req.body?.name)
+      if (!name) return bad(res, 400, 'Tell us your name first')
+      const g = await store.getGuest(name)
+      res.json({ exists: !!g, name: g ? g.name : name })
+    } catch (e) { next(e) }
+  })
+
+  app.post('/api/guests/join', async (req, res, next) => {
+    try {
+      const name = str(req.body?.name)
+      const device_id = str(req.body?.device_id, 80)
+      if (!name) return bad(res, 400, 'Tell us your name first')
+      if (!device_id) return bad(res, 400, 'Missing device id')
+      const existing = await store.getGuest(name)
+      if (existing && !req.body?.takeover) return res.status(409).json({ error: 'name_taken', name: existing.name })
+      const g = existing ? await store.updateGuest(name, { device_id }) : await store.createGuest({ name, device_id })
+      res.status(existing ? 200 : 201).json(publicGuest(g))
+    } catch (e) { next(e) }
+  })
+
+  app.get('/api/guests/me', async (req, res, next) => {
+    try {
+      const name = str(req.query.name)
+      if (!name) return bad(res, 400, 'Missing name')
+      const g = await store.getGuest(name)
+      if (!g) return bad(res, 404, 'Guest not found')
+      res.json(publicGuest(g))
+    } catch (e) { next(e) }
+  })
+
+  app.put('/api/guests/me', async (req, res, next) => {
+    try {
+      const name = str(req.body?.name)
+      if (!name) return bad(res, 400, 'Missing name')
+      const patch = {}
+      if ('prefs' in (req.body || {})) patch.prefs = req.body.prefs === null ? null : normalisePrefs(req.body.prefs)
+      if ('favourite' in (req.body || {})) {
+        const f = req.body.favourite
+        patch.favourite = f && typeof f === 'object' && typeof f.drink_id === 'string'
+          ? { drink_id: str(f.drink_id, 80), mixer: f.mixer ? str(f.mixer, 30) : null, strength: STRENGTHS.includes(f.strength) ? f.strength : null }
+          : null
+      }
+      if (!Object.keys(patch).length) return bad(res, 400, 'Nothing to change')
+      const g = await store.updateGuest(name, patch)
+      if (!g) return bad(res, 404, 'Guest not found')
+      res.json(publicGuest(g))
+    } catch (e) { next(e) }
+  })
+
   app.get('/api/menu', async (_req, res, next) => {
     try { res.json(await menuPayload()) } catch (e) { next(e) }
   })
@@ -77,9 +133,10 @@ export function buildApp(store, { barPin }) {
 
   app.get('/api/orders/mine', async (req, res, next) => {
     try {
+      const guest_name = str(req.query.name)
       const device_id = str(req.query.device_id, 80)
-      if (!device_id) return bad(res, 400, 'Missing device id')
-      const orders = await store.listOrders({ device_id })
+      if (!guest_name && !device_id) return bad(res, 400, 'Missing name')
+      const orders = await store.listOrders(guest_name ? { guest_name } : { device_id })
       res.json({ orders: orders.slice(-20).reverse() })
     } catch (e) { next(e) }
   })
