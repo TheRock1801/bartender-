@@ -8,7 +8,7 @@ const NAME_KEY = 'aj_guest_name'
 const PREFS_KEY = 'aj_prefs'
 const FAV_KEY = 'aj_fav'
 
-const DEFAULT_PREFS: Prefs = { coke: 'fat', lemonade: 'fat', water: 'still' }
+const DEFAULT_PREFS: Prefs = { coke: 'fat', lemonade: 'fat' }
 const fullPrefs = (p: Partial<Prefs> | null | undefined): Prefs | null => (p ? { ...DEFAULT_PREFS, ...p } : null)
 
 export default function GuestApp() {
@@ -198,7 +198,6 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
 const PREF_LABELS: Record<PrefKey, { title: string; options: [string, string] }> = {
   coke: { title: 'coke', options: ['fat', 'skinny'] },
   lemonade: { title: 'lemonade', options: ['fat', 'skinny'] },
-  water: { title: 'water', options: ['still', 'sparkling'] },
 }
 
 function Flavour({ name, prefs, fav, onDone }: {
@@ -208,7 +207,7 @@ function Flavour({ name, prefs, fav, onDone }: {
   onDone: (prefs: Prefs, fav: Favourite | null) => void
 }) {
   const menu = usePoll(api.menu, 30000)
-  const [draft, setDraft] = useState<Prefs>(prefs ?? { coke: 'fat', lemonade: 'fat', water: 'still' })
+  const [draft, setDraft] = useState<Prefs>(prefs ?? DEFAULT_PREFS)
   const [favDraft, setFavDraft] = useState<Favourite | null>(fav)
   const [picking, setPicking] = useState(false)
   const drinks = menu.data?.drinks ?? []

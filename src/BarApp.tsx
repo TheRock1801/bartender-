@@ -93,7 +93,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const settings = queue.data?.settings
   const drinks = menu.data?.drinks ?? []
   const categories = menu.data?.categories ?? []
-  // Bartenders pick the exact pour (Skinny Coke, Sparkling Water…), not the guest-facing base mixer.
+  // Bartenders pick the exact pour (Skinny Coke, Soda…), not the guest-facing base mixer.
   const mixers = menu.data?.mixer_variants ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
   const strengths = menu.data?.strengths ?? []
@@ -380,7 +380,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
             <button key={c} onClick={() => setCat(c)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${cat === c ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60 text-cocoa'}`}>{c.toLowerCase()}</button>
           ))}
         </div>
-        {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, water, sparkling, ginger beer), so just the spirit's name here.</p>}
+        {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, juice & lemonade, water, soda, ginger beer, tonic), so just the spirit's name here.</p>}
         <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'adding…' : 'add to menu'}</button>
       </section>
 

@@ -41,7 +41,7 @@ export const cartCount = (cart: Cart) => Object.values(cart).reduce((n, l) => n 
 export const drinkQty = (cart: Cart, drink_id: string) =>
   Object.values(cart).filter((l) => l.drink_id === drink_id).reduce((n, l) => n + l.qty, 0)
 
-// Client copy of the server's resolveMixer (lib/store.js): Coke / Lemonade / Water
+// Client copy of the server's resolveMixer (lib/store.js): Coke / Lemonade
 // become the exact pour according to the guest's flavour prefs. Keep the two in step.
 export function resolveMixer(mixer: string | null, prefs: Partial<Prefs> | null | undefined): string | null {
   if (!mixer) return mixer
@@ -49,7 +49,6 @@ export function resolveMixer(mixer: string | null, prefs: Partial<Prefs> | null 
   if (mixer === 'Coke') return p.coke === 'skinny' ? 'Skinny Coke' : 'Coke'
   if (mixer === 'Lemonade') return p.lemonade === 'skinny' ? 'Skinny Lemonade' : 'Lemonade'
   if (mixer === 'Juice & Lemonade') return p.lemonade === 'skinny' ? 'Juice & Skinny Lemonade' : 'Juice & Lemonade'
-  if (mixer === 'Water') return p.water === 'sparkling' ? 'Sparkling Water' : 'Still Water'
   return mixer
 }
 

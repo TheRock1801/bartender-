@@ -22,7 +22,7 @@ export function buildApp(store, { barPin }) {
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
-  // A guest's base mixer (Coke / Lemonade / Water) is resolved with their flavour prefs;
+  // A guest's base mixer (Coke / Lemonade) is resolved with their flavour prefs;
   // a bartender can send the resolved variant directly.
   async function resolveItems(rawItems, { requireAvailable, prefs = {} }) {
     if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'pick something first' }

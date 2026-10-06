@@ -34,7 +34,7 @@ export type Tally = Record<string, number>
 export type CartLine = { drink_id: string; mixer?: string | null; strength?: Strength | null; qty: number }
 
 // Flavour preferences, set once per phone. fat = regular, skinny = diet.
-export type Prefs = { coke: 'fat' | 'skinny'; lemonade: 'fat' | 'skinny'; water: 'still' | 'sparkling' }
+export type Prefs = { coke: 'fat' | 'skinny'; lemonade: 'fat' | 'skinny' }
 export type PrefKey = keyof Prefs
 
 // A guest's pinned favourite. mixer is the BASE mixer (Coke, not Skinny Coke).

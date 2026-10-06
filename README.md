@@ -8,7 +8,7 @@ queue on their own phones, claim orders so nobody doubles up, and walk the drink
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | Type your name (remembered on the phone), browse four tabs (Spirits, Cocktails, Beer & Wine, Soft Drinks), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, juice & lemonade, water, ginger beer, tonic), with an optional light or stiff pour. See live status of your drinks. |
+| `/` | Guests | Type your name (remembered on the phone), browse four tabs (Spirits, Cocktails, Beer & Wine, Soft Drinks), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, juice & lemonade, water, soda, ginger beer, tonic), with an optional light or stiff pour. See live status of your drinks. |
 | `/bar` | Bartenders | Shared PIN, then pick your name from the four. Queue (claim / made it / delivered), type in verbal orders, add drinks, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
