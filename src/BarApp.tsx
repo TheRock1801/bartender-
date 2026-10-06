@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, minutesAgo, store, stored, type Drink, type Order, type Settings, type Tally } from './api'
-import { bumpCart, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { api, minutesAgo, store, stored, type Drink, type Order, type Settings, type Strength, type Tally } from './api'
+import { bumpCart, cartLines, drinkStrength, groupByTab, itemLabel, setStrength, type Cart } from './cart'
 import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
@@ -93,6 +93,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const categories = menu.data?.categories ?? []
   const mixers = menu.data?.mixers ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
+  const strengths = menu.data?.strengths ?? []
   const tally = queue.data?.tally ?? {}
   const newCount = orders.filter((o) => o.status === 'new').length
   const openDrink = openDrinkId ? drinks.find((d) => d.id === openDrinkId) ?? null : null
@@ -141,7 +142,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
       <div className="px-4 mt-4">
         {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
-        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
+        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
         {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
@@ -256,8 +257,9 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
           <li key={i.id}>
             <span className="font-semibold">{i.qty}×</span>{' '}
             {i.drink_id ? (
-              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer)}</button>
-            ) : itemLabel(i.drink_name, i.mixer)}
+              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer, i.strength)}</button>
+            ) : itemLabel(i.drink_name, i.mixer, i.strength)}
+            {i.strength && <span className={`pill ml-2 capitalize ${i.strength === 'stiff' ? 'bg-amber text-white' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
           </li>
         ))}
       </ul>
@@ -272,8 +274,8 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
 
 // ---- New (verbal) order ----
 
-function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, onPlaced, onError }: {
-  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string
+function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, strengths, onPlaced, onError }: {
+  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string; strengths: Strength[]
   onPlaced: (o: Order) => void; onError: (m: string) => void
 }) {
   const [guest, setGuest] = useState('')
@@ -284,7 +286,9 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, onPlac
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
   const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
   const lines = cartLines(cart)
-  const bump = (drink_id: string, mixer: string | null, delta: number) => setCart((c) => bumpCart(c, drink_id, mixer, delta))
+  const bump = (drink_id: string, mixer: string | null, delta: number) =>
+    setCart((c) => bumpCart(c, drink_id, mixer, delta, drinkStrength(c, drink_id)))
+  const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
 
   const submit = async () => {
     setBusy(true)
@@ -318,8 +322,10 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, onPlac
           drinks={activeDrinks}
           cart={cart}
           onBump={bump}
+          onStrength={strengthFor}
           isSpirit={activeTab === spiritsCategory}
           mixers={mixers}
+          strengths={activeTab === spiritsCategory ? strengths : []}
           canOrder={() => true}
           compact
         />

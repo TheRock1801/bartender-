@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS, STRENGTHS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -13,7 +13,11 @@ export function buildApp(store, { barPin }) {
 
   async function menuPayload() {
     const [drinks, settings] = await Promise.all([store.listDrinks(), store.getSettings()])
-    return { drinks, settings, categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, mixers: MIXERS }
+    return {
+      drinks, settings,
+      categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, mixers: MIXERS,
+      strengths: STRENGTHS,
+    }
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
@@ -34,8 +38,14 @@ export function buildApp(store, { barPin }) {
       } else if (it.mixer) {
         return { error: `${d.name} doesn't come with a mixer` }
       }
-      const key = d.id + '|' + (mixer || '')
-      merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, qty: (merged.get(key)?.qty || 0) + qty })
+      let strength = null
+      if (it.strength) {
+        strength = str(it.strength, 10).toLowerCase()
+        if (!STRENGTHS.includes(strength)) return { error: 'Strength can be light or stiff' }
+        if (d.category !== SPIRITS_CATEGORY) return { error: 'Light or stiff is only for spirits' }
+      }
+      const key = d.id + '|' + (mixer || '') + '|' + (strength || '')
+      merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, strength, qty: (merged.get(key)?.qty || 0) + qty })
     }
     return { items: [...merged.values()] }
   }

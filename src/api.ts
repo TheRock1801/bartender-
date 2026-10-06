@@ -9,7 +9,8 @@ export type Drink = {
   instructions: string
 }
 
-export type OrderItem = { id: string; drink_id: string | null; drink_name: string; mixer: string | null; qty: number }
+export type Strength = 'light' | 'stiff'
+export type OrderItem = { id: string; drink_id: string | null; drink_name: string; mixer: string | null; strength: Strength | null; qty: number }
 
 export type OrderStatus = 'new' | 'making' | 'ready' | 'delivered' | 'cancelled'
 
@@ -30,7 +31,7 @@ export type Settings = { ordering_open: boolean; last_orders: boolean }
 // drink id -> how many ordered tonight (cancelled orders excluded)
 export type Tally = Record<string, number>
 
-export type CartLine = { drink_id: string; mixer?: string | null; qty: number }
+export type CartLine = { drink_id: string; mixer?: string | null; strength?: Strength | null; qty: number }
 
 export type MenuPayload = {
   drinks: Drink[]
@@ -38,6 +39,7 @@ export type MenuPayload = {
   categories: string[]       // tab order
   spirits_category: string   // drinks in this category are ordered as spirit + mixer
   mixers: string[]
+  strengths: Strength[]   // light/stiff choice, spirits only
 }
 
 async function req<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {

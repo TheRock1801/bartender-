@@ -178,3 +178,32 @@ test('spirits need a valid mixer, other drinks refuse one, and spirit+mixer line
   const queue = await call('/api/bar/orders', { pin: PIN })
   assert.ok(queue.body.tally[bourbon.id] >= 4)
 })
+
+test('light/stiff is kept per line, validated, and only allowed on spirits', async () => {
+  const { drinks } = (await call('/api/menu')).body
+  const bourbon = drinks.find((d) => d.name === 'Bourbon')
+  const paloma = drinks.find((d) => d.name === 'Paloma')
+  const speights = drinks.find((d) => d.name === 'Speights')
+  const order = (items) => call('/api/orders', { method: 'POST', body: { guest_name: 'Todd', device_id: 'dev-s', items } })
+
+  assert.equal((await order([{ drink_id: bourbon.id, mixer: 'Coke', strength: 'double' }])).status, 400)
+  assert.equal((await order([{ drink_id: speights.id, strength: 'stiff' }])).status, 400)
+  assert.equal((await order([{ drink_id: paloma.id, strength: 'stiff' }])).status, 400)
+
+  const ok = await order([
+    { drink_id: bourbon.id, mixer: 'Coke', strength: 'stiff' },
+    { drink_id: bourbon.id, mixer: 'Coke' },
+    { drink_id: bourbon.id, mixer: 'Coke', strength: 'STIFF' },
+    { drink_id: bourbon.id, mixer: 'Rocks', strength: 'light', qty: 2 },
+    { drink_id: paloma.id },
+    { drink_id: speights.id },
+  ])
+  assert.equal(ok.status, 201)
+  assert.deepEqual(ok.body.items.map((i) => [i.drink_name, i.mixer, i.strength, i.qty]), [
+    ['Bourbon', 'Coke', 'stiff', 2],
+    ['Bourbon', 'Coke', null, 1],
+    ['Bourbon', 'Rocks', 'light', 2],
+    ['Paloma', null, null, 1],
+    ['Speights', null, null, 1],
+  ])
+})

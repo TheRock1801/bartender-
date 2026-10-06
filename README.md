@@ -8,7 +8,7 @@ queue on their own phones, claim orders so nobody doubles up, and walk the drink
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | Type your name (remembered on the phone), browse three tabs (Cocktails, Spirits, Beer & Wine), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, still water, sparkling, ginger beer). See live status of your drinks. |
+| `/` | Guests | Type your name (remembered on the phone), browse three tabs (Cocktails, Spirits, Beer & Wine), order. Spirits are picked as spirit + mixer (rocks, Coke, lemonade, still water, sparkling, ginger beer), with an optional light or stiff pour. See live status of your drinks. |
 | `/bar` | Bartenders | Shared PIN, then pick your name from the four. Queue (claim / made it / delivered), type in verbal orders, add drinks, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
@@ -31,7 +31,7 @@ npm run build   # type-check + production bundle
 
 ## Deploy (one-time, ~15 minutes)
 
-1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it, then `supabase_add_instructions.sql`, `supabase_spirits_migration.sql` and `supabase_menu_additions.sql` (added later, in that order).
+1. **Supabase**: new project, paste `supabase_schema.sql` into the SQL editor and run it, then `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql` and `supabase_strength_migration.sql` (added later, in that order).
    Copy the project URL and the `service_role` key (Settings → API).
 2. **Vercel**: import this repo. Set env vars on Production:
    - `SUPABASE_URL`

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { api, deviceId, minutesAgo, store, stored, type Order } from './api'
-import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { api, deviceId, minutesAgo, store, stored, type Order, type Strength } from './api'
+import { bumpCart, cartCount, cartLines, drinkStrength, groupByTab, itemLabel, setStrength, type Cart } from './cart'
 import { CartSummary, DrinkRows } from './DrinkRows'
 import { usePoll } from './usePoll'
 
@@ -101,13 +101,17 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
   const categories = menu.data?.categories ?? []
   const mixers = menu.data?.mixers ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
+  const strengths = menu.data?.strengths ?? []
   const tabs = groupByTab(drinks, categories)
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
   const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
   const count = cartCount(cart)
   const open = settings?.ordering_open !== false
 
-  const bump = (drink_id: string, mixer: string | null, delta: number) => setCart((c) => bumpCart(c, drink_id, mixer, delta))
+  // New lines take the strength already chosen for that spirit, so Light/Stiff applies to every mixer of it.
+  const bump = (drink_id: string, mixer: string | null, delta: number) =>
+    setCart((c) => bumpCart(c, drink_id, mixer, delta, drinkStrength(c, drink_id)))
+  const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
 
   const flash = (kind: 'ok' | 'err', text: string) => {
     setToast({ kind, text })
@@ -191,8 +195,10 @@ function Menu({ name, onChangeName }: { name: string; onChangeName: () => void }
               drinks={activeDrinks}
               cart={cart}
               onBump={bump}
+              onStrength={strengthFor}
               isSpirit={activeTab === spiritsCategory}
               mixers={mixers}
+              strengths={activeTab === spiritsCategory ? strengths : []}
               canOrder={(d) => d.available && open}
             />
           </>
@@ -255,7 +261,7 @@ function GuestOrderCard({ order }: { order: Order }) {
     <div className="card">
       <div className="flex items-start justify-between gap-2">
         <div className="font-semibold">
-          {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer)).join(', ')}
+          {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer, i.strength)).join(', ')}
         </div>
         <span className="text-xs text-cocoa/50 whitespace-nowrap">{minutesAgo(order.created_at)} min ago</span>
       </div>

@@ -1,22 +1,38 @@
-import type { CartLine, Drink } from './api'
+import type { CartLine, Drink, Strength } from './api'
 
 // A cart line is a drink plus, for spirits, what it comes with. The same spirit
 // with two different mixers is two lines.
-export type Cart = Record<string, { drink_id: string; mixer: string | null; qty: number }>
+export type Cart = Record<string, { drink_id: string; mixer: string | null; strength: Strength | null; qty: number }>
 
-export const cartKey = (drink_id: string, mixer: string | null) => `${drink_id}|${mixer ?? ''}`
+export const cartKey = (drink_id: string, mixer: string | null, strength: Strength | null = null) =>
+  `${drink_id}|${mixer ?? ''}|${strength ?? ''}`
 
-export function bumpCart(cart: Cart, drink_id: string, mixer: string | null, delta: number): Cart {
-  const key = cartKey(drink_id, mixer)
+export function bumpCart(cart: Cart, drink_id: string, mixer: string | null, delta: number, strength: Strength | null = null): Cart {
+  const key = cartKey(drink_id, mixer, strength)
   const qty = Math.max(0, Math.min(10, (cart[key]?.qty || 0) + delta))
   const next = { ...cart }
   if (qty === 0) delete next[key]
-  else next[key] = { drink_id, mixer, qty }
+  else next[key] = { drink_id, mixer, strength, qty }
   return next
 }
 
+// One strength per spirit: re-keys every line of that spirit to the new strength.
+export function setStrength(cart: Cart, drink_id: string, strength: Strength | null): Cart {
+  const next: Cart = {}
+  for (const l of Object.values(cart)) {
+    const s = l.drink_id === drink_id ? strength : l.strength
+    const key = cartKey(l.drink_id, l.mixer, s)
+    next[key] = { ...l, strength: s, qty: (next[key]?.qty || 0) + l.qty }
+  }
+  return next
+}
+
+// The strength currently chosen for a drink in the cart (null when none added or regular).
+export const drinkStrength = (cart: Cart, drink_id: string): Strength | null =>
+  Object.values(cart).find((l) => l.drink_id === drink_id)?.strength ?? null
+
 export function cartLines(cart: Cart): CartLine[] {
-  return Object.values(cart).filter((l) => l.qty > 0).map(({ drink_id, mixer, qty }) => ({ drink_id, mixer, qty }))
+  return Object.values(cart).filter((l) => l.qty > 0).map(({ drink_id, mixer, strength, qty }) => ({ drink_id, mixer, strength, qty }))
 }
 
 export const cartCount = (cart: Cart) => Object.values(cart).reduce((n, l) => n + l.qty, 0)
@@ -25,11 +41,13 @@ export const cartCount = (cart: Cart) => Object.values(cart).reduce((n, l) => n 
 export const drinkQty = (cart: Cart, drink_id: string) =>
   Object.values(cart).filter((l) => l.drink_id === drink_id).reduce((n, l) => n + l.qty, 0)
 
-// "Bourbon on the rocks", "Bourbon & Coke", or just the name.
-export function itemLabel(name: string, mixer: string | null | undefined): string {
-  if (!mixer) return name
-  if (mixer === 'Rocks') return `${name} on the rocks`
-  return `${name} & ${mixer}`
+// "Bourbon on the rocks", "Bourbon & Coke, stiff", or just the name.
+export function itemLabel(name: string, mixer: string | null | undefined, strength?: Strength | null): string {
+  let s = name
+  if (mixer === 'Rocks') s = `${name} on the rocks`
+  else if (mixer) s = `${name} & ${mixer}`
+  if (strength) s += `, ${strength}`
+  return s
 }
 
 // Drinks grouped into the server's tab order; any unknown category is appended.
