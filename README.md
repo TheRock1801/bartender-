@@ -1,7 +1,7 @@
 # Aria & Jansen · Drinks
 
 Phone-based drink ordering for a chill wedding. Guests scan a QR code, type their
-name once, and order off the cocktail list. Four mates behind the bar see one live
+name once, and order off the cocktail list. Four mates behind the bar (Rocky, Tussock, Ari, Todd) see one live
 queue on their own phones, claim orders so nobody doubles up, and walk the drinks out.
 
 ## The two screens
@@ -9,7 +9,7 @@ queue on their own phones, claim orders so nobody doubles up, and walk the drink
 | URL | Who | What |
 |---|---|---|
 | `/` | Guests | Type your name (remembered on the phone), browse the menu, order. See live status of your drinks. |
-| `/bar` | Bartenders | Shared PIN, then your name. Queue (claim / made it / delivered), type in verbal orders, add drinks, mark run out, pause ordering, call last orders. |
+| `/bar` | Bartenders | Shared PIN, then pick your name from the four. Queue (claim / made it / delivered), type in verbal orders, add drinks, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
 

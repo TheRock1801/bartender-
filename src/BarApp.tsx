@@ -5,9 +5,16 @@ import { usePoll } from './usePoll'
 const PIN_KEY = 'aj_bar_pin'
 const NAME_KEY = 'aj_bar_name'
 
+// The four of us. Picked from a list rather than typed so names match exactly
+// across phones (claims and "X is on it" labels depend on it).
+export const BARTENDERS = ['Rocky', 'Tussock', 'Ari', 'Todd'] as const
+
 export default function BarApp() {
   const [pin, setPin] = useState(() => stored(PIN_KEY))
-  const [name, setName] = useState(() => stored(NAME_KEY))
+  const [name, setName] = useState(() => {
+    const n = stored(NAME_KEY)
+    return (BARTENDERS as readonly string[]).includes(n) ? n : ''
+  })
   if (!pin) return <PinScreen onOk={(p) => { store(PIN_KEY, p); setPin(p) }} />
   if (!name) return <NameScreen onOk={(n) => { store(NAME_KEY, n); setName(n) }} />
   return (
@@ -49,14 +56,17 @@ function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
 }
 
 function NameScreen({ onOk }: { onOk: (name: string) => void }) {
-  const [v, setV] = useState('')
   return (
     <main className="min-h-dvh flex items-center justify-center px-6">
-      <form onSubmit={(e) => { e.preventDefault(); if (v.trim()) onOk(v.trim()) }} className="card w-full max-w-xs flex flex-col gap-3">
+      <div className="card w-full max-w-xs flex flex-col gap-3">
         <h1 className="font-display text-2xl">Who's pouring?</h1>
-        <input className="input" autoFocus placeholder="Your name" value={v} maxLength={60} onChange={(e) => setV(e.target.value)} />
-        <button className="btn-primary" disabled={!v.trim()}>That's me</button>
-      </form>
+        <div className="grid grid-cols-2 gap-2">
+          {BARTENDERS.map((n) => (
+            <button key={n} className="btn-soft text-lg py-4" onClick={() => onOk(n)}>{n}</button>
+          ))}
+        </div>
+        <p className="text-xs text-cocoa/60">Your phone remembers you. Tap "switch" at the top to change.</p>
+      </div>
     </main>
   )
 }
