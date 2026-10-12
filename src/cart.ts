@@ -50,10 +50,14 @@ export function resolveMixer(mixer: string | null, prefs: Partial<Prefs> | null 
   return mixer
 }
 
-// "Bourbon on the rocks", "Bourbon & Skinny Coke, stiff", or just the name.
+// A hot drink's sugar choice rides in the mixer slot ("No sugar", "1 sugar", "2 sugars").
+export const isSugar = (mixer: string | null | undefined) => /sugar/i.test(mixer ?? '')
+
+// "Bourbon on the rocks", "Bourbon & Skinny Coke, stiff", "Tea, 1 sugar", or just the name.
 export function itemLabel(name: string, mixer: string | null | undefined, strength?: Strength | null): string {
   let s = name
   if (mixer === 'Rocks') s = `${name} on the rocks`
+  else if (isSugar(mixer)) s = `${name}, ${mixer!.toLowerCase()}`
   else if (mixer) s = `${name} & ${mixer}`
   if (strength) s += `, ${strength}`
   return s

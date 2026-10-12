@@ -54,6 +54,8 @@ export type MenuPayload = {
   pref_options: Record<PrefKey, string[]>
   default_prefs: Prefs
   strengths: Strength[]       // light/stiff choice, spirits only
+  hot_category: string        // drinks in this category are ordered as drink + sugar
+  sugars: string[]            // the sugar choices; stored in the line's mixer slot
 }
 
 async function req<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {

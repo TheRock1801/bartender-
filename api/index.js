@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, PREVIEW_CATEGORY, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, PREVIEW_CATEGORY, HOT_CATEGORY, SUGARS, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -17,13 +17,14 @@ export function buildApp(store, { barPin }) {
       drinks, settings,
       categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, preview_category: PREVIEW_CATEGORY, mixers: MIXERS,
       mixer_variants: MIXER_VARIANTS, pref_options: PREF_OPTIONS, default_prefs: DEFAULT_PREFS,
-      strengths: STRENGTHS,
+      strengths: STRENGTHS, hot_category: HOT_CATEGORY, sugars: SUGARS,
     }
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
   // A guest's base mixer (Coke / Lemonade) is resolved with their flavour prefs;
-  // a bartender can send the resolved variant directly.
+  // a bartender can send the resolved variant directly. A hot drink's sugar choice
+  // travels in the same `mixer` slot and must be one of SUGARS.
   async function resolveItems(rawItems, { requireAvailable, prefs = {} }) {
     if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'pick something first' }
     const drinks = await store.listDrinks()
@@ -39,6 +40,9 @@ export function buildApp(store, { barPin }) {
         mixer = str(it.mixer, 30)
         if (MIXERS.includes(mixer)) mixer = resolveMixer(mixer, prefs)
         else if (!MIXER_VARIANTS.includes(mixer)) return { error: `what do you want with your ${d.name}?` }
+      } else if (d.category === HOT_CATEGORY) {
+        mixer = str(it.mixer, 30)
+        if (!SUGARS.includes(mixer)) return { error: `sugar in your ${d.name}?` }
       } else if (it.mixer) {
         return { error: `${d.name} doesn't take a mixer` }
       }

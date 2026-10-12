@@ -96,6 +96,8 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   // Bartenders pick the exact pour (Skinny Coke, Soda…), not the guest-facing base mixer.
   const mixers = menu.data?.mixer_variants ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
+  const hotCategory = menu.data?.hot_category ?? 'Hot Drinks'
+  const sugars = menu.data?.sugars ?? []
   const strengths = menu.data?.strengths ?? []
   const tally = queue.data?.tally ?? {}
   const newCount = orders.filter((o) => o.status === 'new').length
@@ -145,7 +147,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
       <div className="px-5 mt-5">
         {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
-        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
+        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} hotCategory={hotCategory} sugars={sugars} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
         {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
@@ -277,8 +279,8 @@ function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Orde
 
 // ---- New (verbal) order ----
 
-function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, strengths, onPlaced, onError }: {
-  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string; strengths: Strength[]
+function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, hotCategory, sugars, strengths, onPlaced, onError }: {
+  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string; hotCategory: string; sugars: string[]; strengths: Strength[]
   onPlaced: (o: Order) => void; onError: (m: string) => void
 }) {
   const [guest, setGuest] = useState('')
@@ -327,7 +329,9 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, streng
           onBump={bump}
           onStrength={strengthFor}
           isSpirit={activeTab === spiritsCategory}
+          isHot={activeTab === hotCategory}
           mixers={mixers}
+          sugars={sugars}
           strengths={activeTab === spiritsCategory ? strengths : []}
           canOrder={() => true}
           compact
@@ -351,7 +355,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
   const [instructions, setInstructions] = useState('')
   const [cat, setCat] = useState('Cocktails')
   const [busy, setBusy] = useState(false)
-  const cats = categories.length ? categories : ['Spirits', 'Cocktails', 'Beer & Wine', 'Soft Drinks']
+  const cats = categories.length ? categories : ['Spirits', 'Cocktails', 'Beer & Wine', 'Soft Drinks', 'Hot Drinks']
 
   const add = async () => {
     setBusy(true)
@@ -366,7 +370,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-2 divider pt-5">
         <h2 className="display text-2xl mb-1">add a drink.</h2>
-        <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Gin)' : cat === 'Beer & Wine' ? 'e.g. Speights, Rosé' : 'Name (e.g. Espresso Martini)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Gin)' : cat === 'Beer & Wine' ? 'e.g. Speights, Rosé' : cat === 'Hot Drinks' ? 'e.g. Hot chocolate' : 'Name (e.g. Espresso Martini)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="What's in it (optional)" value={desc} maxLength={120} onChange={(e) => setDesc(e.target.value)} />
         <textarea
           className="input min-h-[7rem] text-base"
@@ -381,6 +385,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
           ))}
         </div>
         {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, juice & lemonade, water, soda, ginger beer, tonic), so just the spirit's name here.</p>}
+        {cat === 'Hot Drinks' && <p className="text-xs text-cocoa/60">Guests pick the sugar themselves (none, 1 or 2), so just the drink's name here.</p>}
         <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'adding…' : 'add to menu'}</button>
       </section>
 

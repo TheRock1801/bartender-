@@ -314,7 +314,10 @@ function FavouritePicker({ menu, prefs, initial, onPick, onCancel }: {
   const [strength, setStrengthPick] = useState<Strength | null>(initial?.strength ?? null)
   const drink = menu.drinks.find((d) => d.id === drinkId)
   const isSpirit = drink?.category === menu.spirits_category
-  const ready = !!drink && (!isSpirit || !!mixer)
+  // A hot drink's favourite keeps its sugar choice in the mixer slot, like the order line does.
+  const isHot = drink?.category === menu.hot_category
+  const takesMixer = isSpirit || isHot
+  const ready = !!drink && (!takesMixer || !!mixer)
   const list = tabs.find(([c]) => c === tab)?.[1] ?? []
 
   return (
@@ -363,9 +366,22 @@ function FavouritePicker({ menu, prefs, initial, onPick, onCancel }: {
         </>
       )}
 
+      {drink && isHot && (
+        <div>
+          <p className="label mb-2">sugar?</p>
+          <div className="flex flex-wrap gap-2">
+            {menu.sugars.map((s) => (
+              <button key={s} onClick={() => setMixer(s)} className={`rounded border px-3 py-2 font-mono text-xs lowercase ${mixer === s ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`} aria-pressed={mixer === s}>
+                {s.toLowerCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <button className="btn-primary flex-1" disabled={!ready} onClick={() => drink && onPick({ drink_id: drink.id, mixer: isSpirit ? mixer : null, strength: isSpirit ? strength : null })}>
-          {drink ? `save ${itemLabel(drink.name, isSpirit ? resolveMixer(mixer, prefs) : null, isSpirit ? strength : null).toLowerCase()}` : 'pick a drink'}
+        <button className="btn-primary flex-1" disabled={!ready} onClick={() => drink && onPick({ drink_id: drink.id, mixer: takesMixer ? mixer : null, strength: isSpirit ? strength : null })}>
+          {drink ? `save ${itemLabel(drink.name, takesMixer ? resolveMixer(mixer, prefs) : null, isSpirit ? strength : null).toLowerCase()}` : 'pick a drink'}
         </button>
         {onCancel && <button className="btn-soft" onClick={onCancel}>cancel</button>}
       </div>
@@ -396,6 +412,8 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
   const categories = menu.data?.categories ?? []
   const mixers = menu.data?.mixers ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
+  const hotCategory = menu.data?.hot_category ?? 'Hot Drinks'
+  const sugars = menu.data?.sugars ?? []
   const strengths = menu.data?.strengths ?? []
   const tabs = groupByTab(drinks, categories)
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
@@ -515,6 +533,9 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
             {activeTab === spiritsCategory && activeDrinks.length > 0 && (
               <p className="font-mono text-xs text-cocoa/60 mb-3">pick a spirit, then what you want with it.</p>
             )}
+            {activeTab === hotCategory && activeDrinks.length > 0 && (
+              <p className="font-mono text-xs text-cocoa/60 mb-3">pick your drink, then how much sugar.</p>
+            )}
             <DrinkRows
               key={activeTab}
               drinks={activeDrinks}
@@ -522,7 +543,9 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
               onBump={bump}
               onStrength={strengthFor}
               isSpirit={activeTab === spiritsCategory}
+              isHot={activeTab === hotCategory}
               mixers={mixers}
+              sugars={sugars}
               mixerLabel={mixerLabel}
               strengths={activeTab === spiritsCategory ? strengths : []}
               canOrder={(d) => d.available && open}

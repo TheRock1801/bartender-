@@ -4,20 +4,26 @@ import { cartKey, drinkQty, drinkStrength, type Cart } from './cart'
 
 // One tab's worth of drinks with add/remove controls. Shared by the guest menu
 // and the bartender's verbal-order screen. Spirits expand into a panel with the
-// pour (light / stiff) and the mixers; everything else is a plain add / − / + row.
-export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, mixerLabel, strengths, canOrder, compact }: {
+// pour (light / stiff) and the mixers; hot drinks expand into a sugar chooser
+// (the choice rides in the line's mixer slot); everything else is a plain add / − / + row.
+export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, isHot, mixers, sugars, mixerLabel, strengths, canOrder, compact }: {
   drinks: Drink[]
   cart: Cart
   onBump: (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) => void
   onStrength: (drink_id: string, strength: Strength | null) => void
   isSpirit: boolean
+  isHot?: boolean
   mixers: string[]
+  sugars?: string[]        // the sugar choices offered on a hot-drinks tab
   mixerLabel?: (m: string) => string   // how a mixer chip reads (guests see their flavour, e.g. "skinny coke")
   strengths: Strength[]   // empty = no light/stiff choice on this tab (only spirits get one)
   canOrder: (d: Drink) => boolean
   compact?: boolean
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  // Which chips the expanded panel offers: a spirit's mixers or a hot drink's sugars.
+  const expandable = isSpirit || !!isHot
+  const choices = isSpirit ? mixers : (sugars ?? [])
   // The pour someone has picked for a spirit, remembered even before anything of
   // it is in the order (the order itself only knows a strength once a line exists).
   const [pickedStrength, setPickedStrength] = useState<Record<string, Strength | null>>({})
@@ -28,7 +34,7 @@ export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, 
       {drinks.map((d) => {
         const off = !canOrder(d)
         const total = drinkQty(cart, d.id)
-        const open = isSpirit && openId === d.id
+        const open = expandable && openId === d.id
         const strength = d.id in pickedStrength ? pickedStrength[d.id] : drinkStrength(cart, d.id)
         const pick = (st: Strength | null) => {
           setPickedStrength((m) => ({ ...m, [d.id]: st }))
@@ -42,7 +48,7 @@ export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, 
                 {d.description && !compact && <div className="text-sm text-cocoa/60">{d.description}</div>}
                 {!d.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">Run out, sorry</span>}
               </div>
-              {off ? null : isSpirit ? (
+              {off ? null : expandable ? (
                 <button
                   className={`btn-soft px-4 py-2 ${open ? '!bg-cocoa !text-cream' : ''}`}
                   onClick={() => setOpenId(open ? null : d.id)}
@@ -82,9 +88,9 @@ export function DrinkRows({ drinks, cart, onBump, onStrength, isSpirit, mixers, 
                   </div>
                 )}
                 <div>
-                  <p className="label mb-2">{d.name} with…</p>
+                  <p className="label mb-2">{isSpirit ? `${d.name} with…` : 'sugar?'}</p>
                   <div className="flex flex-wrap gap-2">
-                    {mixers.map((m) => {
+                    {choices.map((m) => {
                       const q = cart[cartKey(d.id, m, strength)]?.qty || 0
                       return (
                         <div key={m} className={`inline-flex items-center rounded border ${q ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`}>
