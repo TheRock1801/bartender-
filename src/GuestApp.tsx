@@ -8,7 +8,7 @@ const NAME_KEY = 'aj_guest_name'
 const PREFS_KEY = 'aj_prefs'
 const FAV_KEY = 'aj_fav'
 
-const DEFAULT_PREFS: Prefs = { coke: 'fat', lemonade: 'fat' }
+const DEFAULT_PREFS: Prefs = { coke: 'fat' }
 const fullPrefs = (p: Partial<Prefs> | null | undefined): Prefs | null => (p ? { ...DEFAULT_PREFS, ...p } : null)
 
 export default function GuestApp() {
@@ -197,7 +197,6 @@ function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => vo
 
 const PREF_LABELS: Record<PrefKey, { title: string; options: [string, string] }> = {
   coke: { title: 'coke', options: ['fat', 'skinny'] },
-  lemonade: { title: 'lemonade', options: ['fat', 'skinny'] },
 }
 
 function Flavour({ name, prefs, fav, onDone }: {
@@ -228,7 +227,7 @@ function Flavour({ name, prefs, fav, onDone }: {
               <Slide
                 options={PREF_LABELS[k].options}
                 value={draft[k]}
-                onChange={(v) => setDraft((d) => ({ ...d, [k]: v }))}
+                onChange={(v) => setDraft((d) => ({ ...d, [k]: v as Prefs[PrefKey] }))}
               />
             </div>
           ))}
@@ -251,7 +250,6 @@ function Flavour({ name, prefs, fav, onDone }: {
           menu.data ? (
             <FavouritePicker
               menu={menu.data}
-              prefs={draft}
               initial={favDraft}
               onPick={(f) => { setFavDraft(f); setPicking(false) }}
               onCancel={favDraft ? () => setPicking(false) : undefined}
@@ -296,39 +294,28 @@ function Slide({ options, value, onChange }: { options: [string, string]; value:
   )
 }
 
-// Pick one drink (plus mixer and pour for a spirit) as the favourite.
-function FavouritePicker({ menu, prefs, initial, onPick, onCancel }: {
+// Pick one cocktail as the favourite. Cocktails only (2026-10-13): no spirits, mixers,
+// beer, wine or soft drinks here, so there are no tabs and no pour/mixer controls.
+function FavouritePicker({ menu, initial, onPick, onCancel }: {
   menu: MenuPayload
-  prefs: Prefs
   initial: Favourite | null
   onPick: (f: Favourite) => void
   onCancel?: () => void
 }) {
-  const tabs = groupByTab(menu.drinks, menu.categories)
-  const initialDrink = initial ? menu.drinks.find((d) => d.id === initial.drink_id) : undefined
-  const [tab, setTab] = useState<string>(initialDrink?.category ?? tabs[0]?.[0] ?? '')
-  const [drinkId, setDrinkId] = useState<string | null>(initial?.drink_id ?? null)
-  const [mixer, setMixer] = useState<string | null>(initial?.mixer ?? null)
-  const [strength, setStrengthPick] = useState<Strength | null>(initial?.strength ?? null)
-  const drink = menu.drinks.find((d) => d.id === drinkId)
-  const isSpirit = drink?.category === menu.spirits_category
-  const ready = !!drink && (!isSpirit || !!mixer)
-  const list = tabs.find(([c]) => c === tab)?.[1] ?? []
+  const list = menu.drinks.filter((d) => d.category === menu.favourite_category && d.available)
+  const [drinkId, setDrinkId] = useState<string | null>(
+    initial && list.some((d) => d.id === initial.drink_id) ? initial.drink_id : null,
+  )
+  const drink = list.find((d) => d.id === drinkId)
 
   return (
     <div className="mt-5 flex flex-col gap-4">
-      <div className="flex gap-6 border-b border-taupe/30 overflow-x-auto">
-        {tabs.map(([cat]) => (
-          <button key={cat} onClick={() => setTab(cat)} className={`pb-2 -mb-px whitespace-nowrap font-display font-bold text-base tracking-tight border-b-2 ${tab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}>
-            {cat.toLowerCase()}
-          </button>
-        ))}
-      </div>
+      <p className="label">{menu.favourite_category.toLowerCase()}</p>
       <div className="flex flex-wrap gap-2">
         {list.map((d) => (
           <button
             key={d.id}
-            onClick={() => { setDrinkId(d.id); if (d.category !== menu.spirits_category) { setMixer(null); setStrengthPick(null) } }}
+            onClick={() => setDrinkId(d.id)}
             className={`rounded border px-3 py-2 font-semibold text-sm ${drinkId === d.id ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`}
           >
             {d.name}
@@ -337,33 +324,9 @@ function FavouritePicker({ menu, prefs, initial, onPick, onCancel }: {
         {!list.length && <p className="font-mono text-sm text-cocoa/60">nothing here yet.</p>}
       </div>
 
-      {drink && isSpirit && (
-        <>
-          <div>
-            <p className="label mb-2">pour</p>
-            <div className="flex items-center gap-2">
-              {menu.strengths.map((st) => (
-                <button key={st} onClick={() => setStrengthPick(strength === st ? null : st)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${strength === st ? 'bg-amber text-cream border-amber' : 'border-taupe/60'}`} aria-pressed={strength === st}>{st}</button>
-              ))}
-              {!strength && <span className="font-mono text-xs text-cocoa/50">regular</span>}
-            </div>
-          </div>
-          <div>
-            <p className="label mb-2">{drink.name} with…</p>
-            <div className="flex flex-wrap gap-2">
-              {menu.mixers.map((m) => (
-                <button key={m} onClick={() => setMixer(m)} className={`rounded border px-3 py-2 font-mono text-xs lowercase ${mixer === m ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`} aria-pressed={mixer === m}>
-                  {m === 'Rocks' ? 'on the rocks' : (resolveMixer(m, prefs) ?? m).toLowerCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
       <div className="flex gap-2">
-        <button className="btn-primary flex-1" disabled={!ready} onClick={() => drink && onPick({ drink_id: drink.id, mixer: isSpirit ? mixer : null, strength: isSpirit ? strength : null })}>
-          {drink ? `save ${itemLabel(drink.name, isSpirit ? resolveMixer(mixer, prefs) : null, isSpirit ? strength : null).toLowerCase()}` : 'pick a drink'}
+        <button className="btn-primary flex-1" disabled={!drink} onClick={() => drink && onPick({ drink_id: drink.id, mixer: null, strength: null })}>
+          {drink ? `save ${drink.name.toLowerCase()}` : 'pick a cocktail'}
         </button>
         {onCancel && <button className="btn-soft" onClick={onCancel}>cancel</button>}
       </div>

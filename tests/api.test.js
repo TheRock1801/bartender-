@@ -31,12 +31,13 @@ test('menu is seeded with the two starting drinks and ordering open', async () =
   assert.deepEqual(body.drinks.slice(0, 4).map((d) => d.name), ['Whiskey Old Fashioned', 'Limoncello Spritz', 'Paloma', 'Bourbon'])
   assert.equal(body.drinks.filter((d) => d.category === 'Spirits').length, 7)
   assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine', 'Soft Drinks'])
+  assert.equal(body.favourite_category, 'Cocktails')
   assert.ok(body.mixers.includes('Ginger Beer'))
   assert.ok(body.mixers.includes('Tonic'))
   assert.ok(body.mixers.includes('Juice & Lemonade'))
   assert.ok(body.drinks.some((d) => d.name === 'Juice & Lemonade' && d.category === 'Soft Drinks'))
   assert.ok(body.mixer_variants.includes('Skinny Coke'))
-  assert.deepEqual(body.default_prefs, { coke: 'fat', lemonade: 'fat' })
+  assert.deepEqual(body.default_prefs, { coke: 'fat' })
   assert.equal(body.settings.ordering_open, true)
 })
 
@@ -220,19 +221,19 @@ test('flavour prefs resolve Coke / Lemonade into the exact mixer; bartenders can
 
   const skinny = await order(
     [{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Lemonade' }, { drink_id: bourbon.id, mixer: 'Water' }, { drink_id: bourbon.id, mixer: 'Soda' }, { drink_id: bourbon.id, mixer: 'Rocks' }, { drink_id: bourbon.id, mixer: 'Tonic' }, { drink_id: bourbon.id, mixer: 'Juice & Lemonade' }],
-    { coke: 'skinny', lemonade: 'skinny' },
+    { coke: 'skinny', lemonade: 'skinny' }, // lemonade pref retired 2026-10-13: ignored
   )
   assert.equal(skinny.status, 201)
-  assert.deepEqual(skinny.body.items.map((i) => i.mixer), ['Skinny Coke', 'Skinny Lemonade', 'Water', 'Soda', 'Rocks', 'Tonic', 'Juice & Skinny Lemonade'])
+  assert.deepEqual(skinny.body.items.map((i) => i.mixer), ['Skinny Coke', 'Lemonade', 'Water', 'Soda', 'Rocks', 'Tonic', 'Juice & Lemonade'])
 
   // no prefs = regular everything; junk and retired prefs (the old water one) are ignored
   const plain = await order([{ drink_id: bourbon.id, mixer: 'Coke' }, { drink_id: bourbon.id, mixer: 'Water' }], { coke: 'diet', water: 'sparkling' })
   assert.deepEqual(plain.body.items.map((i) => i.mixer), ['Coke', 'Water'])
 
   // a bartender sends the resolved variant straight through
-  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', items: [{ drink_id: bourbon.id, mixer: 'Skinny Lemonade' }] } })
+  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', items: [{ drink_id: bourbon.id, mixer: 'Skinny Coke' }] } })
   assert.equal(verbal.status, 201)
-  assert.equal(verbal.body.items[0].mixer, 'Skinny Lemonade')
+  assert.equal(verbal.body.items[0].mixer, 'Skinny Coke')
 
   assert.equal((await order([{ drink_id: bourbon.id, mixer: 'Milk' }])).status, 400)
 })
@@ -246,7 +247,7 @@ test('guests are their name: join, taken-name 409, takeover brings prefs/favouri
   assert.deepEqual(joined.body, { name: 'Jess', prefs: null, favourite: null })
 
   const saved = await call('/api/guests/me', { method: 'PUT', body: { name: 'jess', prefs: { coke: 'skinny', water: 'sparkling', lemonade: 'skinny' }, favourite: { drink_id: 'abc', mixer: 'Coke', strength: 'stiff' } } })
-  assert.deepEqual(saved.body.prefs, { coke: 'skinny', lemonade: 'skinny' })
+  assert.deepEqual(saved.body.prefs, { coke: 'skinny' })
   assert.deepEqual(saved.body.favourite, { drink_id: 'abc', mixer: 'Coke', strength: 'stiff' })
 
   // same name, different phone, no takeover: taken
@@ -260,7 +261,7 @@ test('guests are their name: join, taken-name 409, takeover brings prefs/favouri
   const back = await call('/api/guests/join', { method: 'POST', body: { name: 'jess', device_id: 'phone-2', takeover: true } })
   assert.equal(back.status, 200)
   assert.equal(back.body.name, 'Jess')
-  assert.deepEqual(back.body.prefs, { coke: 'skinny', lemonade: 'skinny' })
+  assert.deepEqual(back.body.prefs, { coke: 'skinny' })
 
   // a different Jess adds an initial and is a separate guest
   const other = await call('/api/guests/join', { method: 'POST', body: { name: 'Jess B', device_id: 'phone-3' } })

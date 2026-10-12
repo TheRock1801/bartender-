@@ -34,7 +34,7 @@ export type Tally = Record<string, number>
 export type CartLine = { drink_id: string; mixer?: string | null; strength?: Strength | null; qty: number }
 
 // Flavour preferences, set once per phone. fat = regular, skinny = diet.
-export type Prefs = { coke: 'fat' | 'skinny'; lemonade: 'fat' | 'skinny' }
+export type Prefs = { coke: 'fat' | 'skinny' }
 export type PrefKey = keyof Prefs
 
 // A guest's pinned favourite. mixer is the BASE mixer (Coke, not Skinny Coke).
@@ -48,6 +48,7 @@ export type MenuPayload = {
   settings: Settings
   categories: string[]       // tab order
   spirits_category: string   // drinks in this category are ordered as spirit + mixer
+  favourite_category: string // the only category the join-screen favourite picker offers (cocktails)
   mixers: string[]            // base mixers a guest picks from
   mixer_variants: string[]    // every stored mixer value; bartenders pick from these
   pref_options: Record<PrefKey, string[]>
