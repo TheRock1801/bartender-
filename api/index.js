@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, FAVOURITE_CATEGORY, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, PREVIEW_CATEGORY, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -15,7 +15,7 @@ export function buildApp(store, { barPin }) {
     const [drinks, settings] = await Promise.all([store.listDrinks(), store.getSettings()])
     return {
       drinks, settings,
-      categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, favourite_category: FAVOURITE_CATEGORY, mixers: MIXERS,
+      categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, preview_category: PREVIEW_CATEGORY, mixers: MIXERS,
       mixer_variants: MIXER_VARIANTS, pref_options: PREF_OPTIONS, default_prefs: DEFAULT_PREFS,
       strengths: STRENGTHS,
     }

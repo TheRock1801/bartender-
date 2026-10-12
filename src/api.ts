@@ -48,7 +48,7 @@ export type MenuPayload = {
   settings: Settings
   categories: string[]       // tab order
   spirits_category: string   // drinks in this category are ordered as spirit + mixer
-  favourite_category: string // the only category the join-screen favourite picker offers (cocktails)
+  preview_category: string   // the only category the name screen's menu teaser shows (cocktails)
   mixers: string[]            // base mixers a guest picks from
   mixer_variants: string[]    // every stored mixer value; bartenders pick from these
   pref_options: Record<PrefKey, string[]>
