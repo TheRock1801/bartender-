@@ -1,84 +1,57 @@
-# Aria & Jansen drinks app ("the bartender app") — CLAUDE.md
+# Riley & Jasmine drinks app ("the bartender app") — CLAUDE.md
 
-Personal side project for Rocky Judd, **not Harrows work**. A phone web app for ordering drinks at Aria and Jansen's wedding. Guests scan a QR code, type a name once, order off three tabs. Four mates behind the bar (Rocky, Tussock, Ari, Todd) share one live queue on their own phones. Built 2026-10-06 in one evening; everything below was decided that night.
+Personal side project for Rocky Judd, **not Harrows work**. A phone web app for ordering drinks at Riley and Jasmine's wedding on 3 Nov 2026. Guests scan a QR code, order off four tabs, say collect-or-table, give a name. Whoever is behind the bar shares one live numbered queue on their phones. **Was the Aria & Jansen app until 2026-10-22**, when Rocky had it written over in place for the next wedding ("i just want to hijack arias one, write over it"): same folder, same GitHub repo, same Vercel project, same Supabase project. Restyled to a mood board Rocky sent as a WhatsApp image (three phone mock-ups: menu, "Bourbon — choose your mixer", "Your Order" + a bar queue). That image is the design brief; a copy is at `public/art/mood-board.jpg` and the crops used live beside it.
 
-**Path:** `C:/Users/rockyj/aria-jansen-drinks`
+**Path:** `C:/Users/rockyj/aria-jansen-drinks` (folder name kept from the first wedding; don't rename it, Rocky's shortcuts point here)
 **GitHub:** https://github.com/TheRock1801/bartender- (Rocky's PERSONAL GitHub, note the trailing dash)
-**Vercel:** project `bartender` in Rocky's PERSONAL Vercel account (team slug `rocky-apps`). Auto-deploys on push to `main`. Deployment URL seen so far: `bartender-9dw7dlipa-rocky-apps.vercel.app`; the public production URL is whatever the project's Domains page says.
-**Supabase:** Rocky's own project, created 2026-10-06. Service-role key only, RLS on with no policies.
-**Dev:** `npm run dev` (Vite on 5173 proxying `/api` to Express on 3001, in-memory store, PIN `1234`). `npm test` runs API tests against the in-memory store. `npm run build` type-checks and bundles.
+**Vercel:** project `bartender` in Rocky's PERSONAL Vercel account (team slug `rocky-apps`), auto-deploys on push to `main`. Public URL is whatever the project's Domains page says. Deployment Protection was never confirmed off for Production; check in an incognito window.
+**Supabase:** the same project the A&J app used (created 2026-10-06), service-role key only, RLS on with no policies. **`supabase_riley_jasmine_reset.sql` must be run once in its SQL editor** (wipes the A&J orders/drinks/guests, adds `order_no`/`fulfilment`/`table_no`, loads the new menu). Until then the deployed app shows the old A&J menu and every order write fails on the missing columns. **Not confirmed run as of 2026-10-22.**
+**Dev:** `npm run dev` (Vite 5173 proxying `/api` to Express 3001, in-memory store, PIN `1234`). `npm test` (11 API tests). `npm run build` type-checks and bundles.
 
-## Accounts and access gotchas
+## Accounts and access gotchas (inherited from the A&J app)
 
-- **Commit identity is plain `Rocky Judd <rocky@harrows.co.nz>`**, passed per-commit with `git -c user.name=... -c user.email=...`. Not the HarrowsMarketing identity. Rocky does not want PRs or review branches: finish, verify (tests + build), commit, push to main.
-- **The Vercel CLI on this machine is logged in as `harrowsadmin`** (Harrows team) and cannot see this project. Don't log it into Rocky's personal account without asking, that replaces the Harrows login. The CLI only works on this network with `NODE_TLS_REJECT_UNAUTHORIZED=0`.
-- **`gh` is not on PATH.** GitHub's public API via PowerShell `Invoke-RestMethod` works for deployment status (curl in Git Bash fails TLS here).
-- **Headless Chrome/Edge hang in this sandbox.** Icons were drawn with `jimp` from `~/Harrows-dashboard/node_modules` (script kept in the session scratchpad only; recreate if needed: cream bg, espresso "A&J", orange ampersand, "DRINKS" below).
-- **Vercel Deployment Protection**: as of 2026-10-06 every URL for the project, including the `-rocky-apps` production alias, redirected to Vercel Authentication. Guests would hit a login screen. Rocky was told to set Settings → Deployment Protection to preview-only (or off) and confirm in an incognito window. A custom domain (wanted, not yet chosen) is public regardless. **Not yet confirmed fixed.**
-- **Git on this machine converts LF to CRLF on checkout.** Any multi-line string replacement against a freshly checked-out file must normalise `\r\n` first, or anchors silently miss.
+- **Commit identity is plain `Rocky Judd <rocky@harrows.co.nz>`**, passed per-commit with `git -c user.name=... -c user.email=...`. No PRs or review branches: finish, verify (tests + build), commit, push to main.
+- **The Vercel CLI on this machine is logged in as `harrowsadmin`** and cannot see Rocky's personal projects. Don't log it into his personal account without asking.
+- **`gh` is not on PATH.** GitHub's public API via PowerShell `Invoke-RestMethod` works for deployment status.
+- **Headless Chrome/Edge hang in this sandbox**, so nothing here has been screenshotted; Rocky checks on his phone. Images are made with `jimp` from `~/Harrows-dashboard/node_modules` (`Jimp.read`, `.crop({x,y,w,h})`, `.scaleToFit({w,h})`, `.composite`, `.write`).
+- **Git converts LF to CRLF on checkout.** Normalise `\r\n` before multi-line string replacements.
 
-## Stack and layout
+## What changed from the Aria & Jansen app (all 2026-10-22, from the mood board)
 
-React 19 + Vite + TypeScript + Tailwind v3, Express in one Vercel function, Supabase via `@supabase/supabase-js`. Installable PWA.
-
-```
-api/index.js        all routes. Guest: GET /api/menu, POST /api/orders, GET /api/orders/mine.
-                    Bar (x-bar-pin header): /api/bar/login, /orders (GET incl. tally, POST verbal order,
-                    PATCH :id actions claim/unclaim/ready/delivered/cancel/reopen), /drinks (POST, PATCH :id,
-                    DELETE :id), /settings. resolveItems() validates drink/mixer/strength and merges lines.
-lib/store.js        memoryStore() and supabaseStore() behind one interface. Also the menu constants:
-                    CATEGORIES, SPIRITS_CATEGORY, PREVIEW_CATEGORY, HOT_CATEGORY, SUGARS, MIXERS, STRENGTHS, SEED_DRINKS.
-server.js           local dev only
-src/App.tsx         path router: /bar -> BarApp, everything else -> GuestApp
-src/GuestApp.tsx    Join (name lookup / is-that-you / initial) -> Flavour (prefs slide toggles + FavouritePicker) -> Menu (favourite pinned, ordering)
-src/BarApp.tsx      PIN -> pick name -> Bar (queue / + order / menu tabs, DrinkSheet recipe popup)
-src/DrinkRows.tsx   shared ordering rows (spirit panel with pour + mixers) and CartSummary
-src/cart.ts         cart keyed by drink|mixer|strength; bumpCart, setStrength, itemLabel, groupByTab
-src/api.ts          typed fetch client + localStorage helpers
-src/usePoll.ts      visibility-aware polling
-src/index.css       design tokens as component classes (see Look)
-tailwind.config.js  colour/font tokens
-public/             manifest.webmanifest, sw.js (network-only, caches NOTHING on purpose), icons
-supabase_*.sql      migrations, see below
-tests/api.test.js   node:test, 13 tests
-```
+- **No sign-in step, no flavour prefs, no favourite, no guests table.** The name is typed on the "Your Order" page and remembered on the phone (`rj_guest_name`); "your drinks" are found by `device_id` only (`GET /api/orders/mine?device_id=`). The `guests` routes/table/migration are gone.
+- **Collect or deliver (new):** `orders.fulfilment` (`collect` default | `deliver`) + `orders.table_no` (required when delivering, nulled otherwise), validated in `resolveFulfilment()` in `api/index.js`, for guest and verbal orders alike. Remembered on the phone (`rj_fulfilment`, `rj_table`).
+- **Order numbers (new):** `orders.order_no` is a Postgres `serial` (the memory store counts from 1); shown as `#14` on both screens. The bar fetches `?all=1` every poll so its Delivered filter works.
+- **Tabs: Spirits, Cocktails, Beer & Wine, Non-alcoholic** (`CATEGORIES`). Hot Drinks and the sugar logic are gone. Seed menu is in `lib/store.js` and `supabase_schema.sql`: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac / Espresso Martini, Aperol Spritz, Whiskey Sour / Beer, Red, White, Sparkling wine / Lemonade, Juice, Sparkling water. The cocktails are placeholders Rocky hasn't confirmed.
+- **Mixers** (`MIXERS`): Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Orange/Pineapple/Cranberry juice (shown under one "Juice" row with flavour chips, `isJuice()` in `src/cart.ts`), On the rocks, plus **Other**: the guest types up to 40 chars, stored in `order_items.mixer` as `Other: <text>` (`OTHER_MIXER_RE`, `isValidMixer()`); `itemLabel()` renders it as "Gin & lime and soda". Coke Zero replaces the old fat/skinny pref; `resolveMixer`/`MIXER_VARIANTS` are gone, bartenders use the same list.
+- **Light / stiff pour kept** (spirits only, server-validated, same as before) but now a "Pour: Regular / Light / Stiff" row at the bottom of the mixer page, not chips in the row. The mood board doesn't show it; Rocky hasn't said whether this couple wants it. Easy to hide by passing `strengths={[]}` to `MixerSheet`.
+- **Mixer picking is a full-screen page** (`MixerSheet` in `src/DrinkRows.tsx`): back arrow, big glass, spirit name, "Choose your mixer", radio rows, then "Add to order" fixed at the bottom. Tapping "Choose" on a spirit opens it; non-spirits are Add then − n +.
+- **"Your Order" is a full-screen page** (`OrderSheet` in `src/GuestApp.tsx`): florals, script heading, lines with − n +, "How would you like your drink?" two cards, table number, name, "Place order — it's on us!". The bottom bar on the menu is one button, "View your order · n drinks".
+- **Bar queue restyled** (`Queue`/`OrderRow` in `src/BarApp.tsx`): filter tabs All orders / New / Preparing / Ready / Delivered with counts, rows of `#no + time | glass | name + drinks | Deliver Table 4 or Collect at bar | status pill` (sand New, terracotta Preparing, olive Ready, grey Delivered). Tap a row to expand the items and the actions. Claims work as before (`claim/unclaim/ready/delivered/cancel/reopen`); the pill shows "· you" or "· Name" for who has it. The mood board's "Preparing" dropdown became explicit buttons on purpose (no mis-taps).
+- **`BARTENDERS` in `src/BarApp.tsx` is `['Rocky', 'Bartender 2', 'Bartender 3', 'Bartender 4']`**: Rocky hasn't said who's pouring this time. Replace before the night.
+- localStorage keys are `rj_*` (device id, guest name, fulfilment, table, bar PIN, bar name).
 
 ## Data model (Supabase)
 
-- `drinks`: id, name, description, category, available, sort, added_by, instructions (recipe text), created_at
-- `orders`: id, guest_name, device_id, placed_by (bartender for verbal orders), status new/making/ready/delivered/cancelled, claimed_by, created_at, updated_at
-- `order_items`: id, order_id (cascade), drink_id (set null on drink delete), drink_name, mixer, strength, qty
-- `settings`: key/value jsonb (`ordering_open`, `last_orders`)
-- `guests` (added 2026-10-07): id, name, name_key (unique, lowercased/trimmed), device_id (phone currently using it), prefs jsonb, favourite jsonb, timestamps. **A guest's name IS their account.**
+`supabase_riley_jasmine_reset.sql` is the one to run on the existing project (see above); it is idempotent in the sense that running it again just resets again. `supabase_schema.sql` is the same end state built from scratch, only for a brand-new project. Tables: drinks (incl. instructions), orders (incl. order_no serial, fulfilment, table_no), order_items (incl. mixer, strength), settings. The old `guests` table is dropped by the reset. No migration runner; Rocky pastes SQL into the Supabase editor. Any new column needs a new file and must be run before the deploy that uses it.
 
-**Migrations, run manually in the Supabase SQL editor, in this order** (no migration runner; all idempotent): `supabase_schema.sql`, `supabase_add_instructions.sql`, `supabase_spirits_migration.sql`, `supabase_menu_additions.sql`, `supabase_strength_migration.sql`, `supabase_guests_migration.sql`, `supabase_soft_drinks_migration.sql` (2026-10-07: fixes a live "Burbon" typo, adds Juice & Lemonade under Soft Drinks), `supabase_hot_drinks_migration.sql` (2026-10-13: adds Flat White / Black coffee / Tea under Hot Drinks; data only, no schema change). **The first seven confirmed run by Rocky (first five 2026-10-06, guests 2026-10-07 after the live app showed "could not find the table public.guests", soft drinks 2026-10-07). Hot drinks NOT yet confirmed run as of 2026-10-13: until it is, the live Hot Drinks tab is empty ("nothing here yet") because the seed list in `lib/store.js` only feeds the in-memory store.** A new column needs a new file and Rocky has to run it before the deploy that uses it, or writes fail.
+## Product rules carried over (don't undo)
 
-Env vars on Vercel (Production): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (must be the service_role / `sb_secret_` key, the publishable key gives "violates row-level security"), `BAR_PIN`. Env changes need a redeploy to take effect.
+- Deliberately minimal: no payments, no accounts, no email, no per-guest order cap.
+- Bartenders pick their name from a fixed list, never type it.
+- A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected. Lines with the same drink + mixer + pour merge.
+- Verbal orders ignore `ordering_open` and availability so the bar can always record what it's making.
+- Tapping a drink name (Menu tab, or inside an expanded order) opens the recipe sheet: instructions, ordered-tonight tally, mark run out, remove (confirm step; past orders keep the name).
+- Optional chime on new orders (needs a tap first).
 
-## Product rules Rocky has set (don't undo)
+## Look (from the mood board, sampled with jimp)
 
-- Deliberately minimal: no tables, no "where am I", no per-guest order cap, no payments, no accounts, no email. Date doesn't matter.
-- **Guests log in with just their name (2026-10-07).** `POST /api/guests/lookup` says if a name exists; `POST /api/guests/join` creates it or, with `takeover`, re-links it to this phone ("there's already a Sam here. is that you?" → yes). A different person with a taken name is prompted for a last-name initial and becomes "Sam B" (loops if that is taken too). Prefs and favourite live on the guest row (`PUT /api/guests/me`) with a localStorage cache; `/api/orders/mine?name=` matches orders case-insensitively by `guest_name`, so a new phone gets the drinks back too. The name page's "recent orders from this phone" still uses `?device_id=`. No passwords, deliberately: anyone can claim any name by saying "yes, that's me".
-- **The name screen's "on the menu tonight" teaser shows cocktails only (2026-10-13).** `PREVIEW_CATEGORY` in `lib/store.js`, sent as `preview_category` on `/api/menu`. Rocky: "i just didnt want spirits and soft drinks to show on the first screen before you add your name". The favourite picker and the real menu still show every tab. (Claude first misread this as "favourite picker is cocktails only" and shipped that in `eb9d56a`; reverted the same day.)
-- Bartenders pick their name from the fixed list `BARTENDERS` in `BarApp.tsx`, never type it.
-- **Menu tabs are fixed and in this order: Spirits, Cocktails, Beer & Wine, Soft Drinks, Hot Drinks** (`CATEGORIES`; Soft Drinks added 2026-10-07, Hot Drinks 2026-10-13). Spirits is the default tab.
-- **Hot drinks are ordered as drink + sugar (added 2026-10-13, Rocky: "ordering for Flat White, Black, or Tea, with a sugar option").** `HOT_CATEGORY`/`SUGARS` in `lib/store.js`: No sugar / 1 sugar / 2 sugars, required (a hot drink without one is rejected server-side, same as a spirit without a mixer), sent as `hot_category`/`sugars` on `/api/menu`. **The choice is stored in `order_items.mixer`**, the same slot a spirit's mixer uses, so there was no schema change; `itemLabel()` in `src/cart.ts` recognises a sugar value by regex (`isSugar`) and renders "Tea, 1 sugar" rather than "Tea & 1 sugar". `DrinkRows` treats a hot-drinks tab like a spirits tab (tap "choose", chips appear) via `isHot`/`sugars` props; no pour. A hot drink can be a favourite (sugar kept in the favourite's `mixer`). No milk option, deliberately not asked for.
-- **Spirits are ordered as spirit + mixer.** Guest-facing base mixers (`MIXERS`): Rocks ("on the rocks"), Coke, Lemonade, Juice & Lemonade, Water, Soda, Ginger Beer, Tonic (Tonic, Juice & Lemonade and Soda added 2026-10-07; Water and Soda are plain mixers, the still/sparkling water pref was removed the same day because guests didn't like the split; Lemonade and Juice & Lemonade are plain mixers too since 2026-10-13, see Flavour prefs). A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected.
-- **Flavour prefs (added 2026-10-06, moved server-side onto the guest row 2026-10-07):** after the name, a "what's your flavour?" step with ONE slide toggle: coke fat/skinny (fat = regular, skinny = diet). Two others have come and gone: water still/sparkling (removed 2026-10-07, water and soda are plain mixers) and lemonade fat/skinny (removed 2026-10-13, Rocky: "we only have normal lemonade"); `normalisePrefs()` drops the stale `water`/`lemonade` keys from old phones/guest rows. Stored on the guest row with a phone cache (`aj_prefs`) and sent with every guest order; the server's `resolveMixer()` turns the base mixer into the exact pour and THAT is what `order_items.mixer` stores (Coke / Skinny Coke / Lemonade / Juice & Lemonade / Water / Soda / Ginger Beer / Tonic). Bartenders' verbal-order chips are the resolved `MIXER_VARIANTS` directly. `src/cart.ts` has a client copy of resolveMixer for labels, keep the two in step. Older rows may still hold retired mixers ("Water (still)", "Sparkling", "Still Water", "Sparkling Water", "Skinny Lemonade", "Juice & Skinny Lemonade"); they render as-is.
-- **Favourite:** same step offers "add your favourite" (drink + mixer + pour for a spirit, every tab); stored on the phone (`aj_fav`, base mixer) and pinned at the top of the menu with an "add one" button and a "change favourite" link. Hidden if the drink was removed. "your flavour" link next to "not you?" reopens the step.
-- **Light / Stiff pour is spirits only** (Rocky corrected this mid-build: "no only spirits not cocktails"). One pour per spirit in an order; changing it moves every line of that spirit. Null = regular.
-- Pour chips appear only inside a spirit's panel after tapping "choose", never up front (Rocky's second correction). The bottom bar is a `+N` count chip (opens a review sheet with − / + per line) and a "complete order" button.
-- Spirits on the menu: Bourbon, Vodka, Gin, Whisky, Rum, Dark rum, Tequila. Cocktails: Whiskey Old Fashioned, Limoncello Spritz, Paloma (recipes in `instructions`). Beer & Wine: Speights, Red wine, White wine, Sparkling wine. Soft Drinks: Juice & Lemonade. Hot Drinks: Flat White, Black coffee, Tea. Bartenders add/remove more from the app.
-- Tapping a drink on the bar's Menu tab (or a drink name in the queue) opens a recipe sheet: instructions (editable), ordered-tonight tally (cancelled excluded), mark run out, remove (confirm step; past orders keep the name).
-- Bar queue: "Up for grabs" / "Mine" / "Others are on it"; claim, made it, delivered, put back, cancel. Optional chime on new orders (needs a tap first).
+Tokens in `tailwind.config.js` keep the OLD colour names so shared classes work: `cream` #F7E9CF page, `ivory` #FCF2DF cards/sheets, `sand` #EFDFC4 fills, `taupe` #D9C7A8 hairlines, `cocoa` #4A3A2E body, `espresso` #3A2C22 headings, `stone` #8E8375 muted, `amber` #9B5233 terracotta (primary buttons, Preparing), `sage` #7C7349 olive (Ready), `mist` #E3DAD1 (Delivered). Fonts (Google): **Italianno** `script` for "Riley & Jasmine", "the bar", "Your Order"; **Cormorant Garamond** `display` for drink names and headings (Title Case, no lowercase-with-full-stop convention any more); **Jost** body at weight 300, `spaced` (0.28em caps) for tabs/"DRINKS ARE ON US"/date, `label` (0.2em caps) for small headings. Classes in `src/index.css`: `btn-primary` (terracotta), `btn-dark`, `btn-soft` (thin outline, the "Choose" button), `btn-ghost`, `card` (ivory, rounded-2xl, no border), `row`, `divider`, `input`, `pill`, `ring-radio`, `step-btn`, `fade-up`. Faint paper grain. Reduced motion respected. No shadows.
 
-## Look (restyled 2026-10-06 to a written stationery brief; the reference screenshot never arrived)
-
-Warm, editorial, lowercase. Tokens in `tailwind.config.js` keep the ORIGINAL colour names so old classes work: `cream`/`ivory` #F3E8DB page, `sand` #DDC9B5, `taupe` #A58E7B rules, `peach` #EBC3A5, `cocoa`/`espresso` #42362F text, `amber` = burnt orange #B85E28 for primary actions and sparse accents, `sage` #7E8C74 only for ready/delivered. Fonts from Google Fonts with fallbacks: League Spartan 800 for `display` headings (written lowercase with a full stop: "aria & jansen.", "menu.", "bar."), IBM Plex Mono for `label`/`eyebrow`/chips/meta, Inter body. Classes: `btn-primary` (espresso/ivory), `btn-soft` (transparent, thin espresso border), `btn-ghost`, `card`, `row` (hairline list rows, preferred over cards), `divider`, `input`, `pill`, `fade-up`. Faint SVG paper grain on `body::before`. `prefers-reduced-motion` respected. No shadows, no pills-as-buttons, no gradients beyond the bottom-bar fade. The brief's countdown/RSVP/schedule/gallery sections do NOT apply (this isn't a wedding website); Rocky may ask for a landing page later.
+**Artwork:** `public/art/header.png` (florals/candles/bottle/glasses) and `glass-{whiskey,bourbon,gin,vodka,rum,brandy,cognac,hero}.png` are literal crops of the mood board JPEG (scratchpad script `crop.cjs`, 1024×1536 source), so they're low-res (~86px glasses, 340px header) and carry the board's own cream background (#F6E5C7–#FDEFD8, which is why `cream` was chosen to sit between). Fine on a phone, soft on a big screen. Swap them for the real artwork files when Rocky gets them; `glassFor()` in `src/art.tsx` maps a spirit's name to a file and everything else gets the tumbler. PWA icons are the tumbler on cream (scratchpad `icons.cjs`).
 
 ## Open items
 
-- Custom domain: Rocky wants one, none chosen yet. Add in Vercel → Domains; CNAME `cname.vercel-dns.com` for a subdomain or A `76.76.21.21` for a bare domain. Then update `manifest.webmanifest`/README if the name matters.
-- Confirm Deployment Protection is off for production (see gotchas) and that the QR code points at the public domain.
-- Nothing in this app has been screenshotted or visually verified by Claude; Rocky checks on his phone. Rocky's installed PWA keeps the loaded version until fully closed and reopened.
-- Local Vercel CLI can't inspect this project; if build logs are ever needed, ask Rocky to paste them or use a personal-account token with `vercel --token`.
+- Rocky to run `supabase_riley_jasmine_reset.sql` and confirm, then place a test order on the live site. Consider changing `BAR_PIN` on Vercel if the A&J crew still know the old one.
+- Real bartender names, real cocktail list, and whether to keep the light/stiff pour: all Rocky's calls, none confirmed.
+- Not visually verified by Claude (no headless browser here); Rocky checks on his phone. Watch for: the Non-alcoholic tab label width on narrow phones (tabs scroll horizontally), and the header crop's cream not quite matching the page on OLED screens.
+- Custom domain / QR code: same as the A&J app, nothing chosen.

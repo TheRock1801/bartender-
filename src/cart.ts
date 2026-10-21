@@ -1,4 +1,4 @@
-import type { CartLine, Drink, Prefs, Strength } from './api'
+import type { CartLine, Drink, Strength } from './api'
 
 // A cart line is a drink plus, for spirits, what it comes with. The same spirit
 // with two different mixers is two lines.
@@ -16,21 +16,6 @@ export function bumpCart(cart: Cart, drink_id: string, mixer: string | null, del
   return next
 }
 
-// One strength per spirit: re-keys every line of that spirit to the new strength.
-export function setStrength(cart: Cart, drink_id: string, strength: Strength | null): Cart {
-  const next: Cart = {}
-  for (const l of Object.values(cart)) {
-    const s = l.drink_id === drink_id ? strength : l.strength
-    const key = cartKey(l.drink_id, l.mixer, s)
-    next[key] = { ...l, strength: s, qty: (next[key]?.qty || 0) + l.qty }
-  }
-  return next
-}
-
-// The strength currently chosen for a drink in the cart (null when none added or regular).
-export const drinkStrength = (cart: Cart, drink_id: string): Strength | null =>
-  Object.values(cart).find((l) => l.drink_id === drink_id)?.strength ?? null
-
 export function cartLines(cart: Cart): CartLine[] {
   return Object.values(cart).filter((l) => l.qty > 0).map(({ drink_id, mixer, strength, qty }) => ({ drink_id, mixer, strength, qty }))
 }
@@ -41,27 +26,18 @@ export const cartCount = (cart: Cart) => Object.values(cart).reduce((n, l) => n 
 export const drinkQty = (cart: Cart, drink_id: string) =>
   Object.values(cart).filter((l) => l.drink_id === drink_id).reduce((n, l) => n + l.qty, 0)
 
-// Client copy of the server's resolveMixer (lib/store.js): Coke
-// becomes the exact pour according to the guest's flavour prefs. Keep the two in step.
-export function resolveMixer(mixer: string | null, prefs: Partial<Prefs> | null | undefined): string | null {
-  if (!mixer) return mixer
-  const p = prefs ?? {}
-  if (mixer === 'Coke') return p.coke === 'skinny' ? 'Skinny Coke' : 'Coke'
-  return mixer
-}
-
-// A hot drink's sugar choice rides in the mixer slot ("No sugar", "1 sugar", "2 sugars").
-export const isSugar = (mixer: string | null | undefined) => /sugar/i.test(mixer ?? '')
-
-// "Bourbon on the rocks", "Bourbon & Skinny Coke, stiff", "Tea, 1 sugar", or just the name.
+// "Bourbon & Coke", "Whiskey on the rocks", "Gin & Other: lime & soda, stiff", or just the name.
 export function itemLabel(name: string, mixer: string | null | undefined, strength?: Strength | null): string {
   let s = name
-  if (mixer === 'Rocks') s = `${name} on the rocks`
-  else if (isSugar(mixer)) s = `${name}, ${mixer!.toLowerCase()}`
+  if (mixer === 'On the rocks') s = `${name} on the rocks`
+  else if (mixer?.startsWith('Other: ')) s = `${name} & ${mixer.slice(7)}`
   else if (mixer) s = `${name} & ${mixer}`
   if (strength) s += `, ${strength}`
   return s
 }
+
+// Juices sit under one "Juice" heading on the mixer list.
+export const isJuice = (m: string) => /\bjuice$/i.test(m)
 
 // Drinks grouped into the server's tab order; any unknown category is appended.
 export function groupByTab(drinks: Drink[], categories: string[]): [string, Drink[]][] {

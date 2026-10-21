@@ -10,15 +10,19 @@ export type Drink = {
 }
 
 export type Strength = 'light' | 'stiff'
+export type Fulfilment = 'collect' | 'deliver'
 export type OrderItem = { id: string; drink_id: string | null; drink_name: string; mixer: string | null; strength: Strength | null; qty: number }
 
 export type OrderStatus = 'new' | 'making' | 'ready' | 'delivered' | 'cancelled'
 
 export type Order = {
   id: string
+  order_no: number
   guest_name: string
   device_id: string | null
   placed_by: string | null
+  fulfilment: Fulfilment
+  table_no: string | null
   status: OrderStatus
   claimed_by: string | null
   created_at: string
@@ -33,30 +37,18 @@ export type Tally = Record<string, number>
 
 export type CartLine = { drink_id: string; mixer?: string | null; strength?: Strength | null; qty: number }
 
-// Flavour preferences, set once per phone. fat = regular, skinny = diet.
-export type Prefs = { coke: 'fat' | 'skinny' }
-export type PrefKey = keyof Prefs
-
-// A guest's pinned favourite. mixer is the BASE mixer (Coke, not Skinny Coke).
-export type Favourite = { drink_id: string; mixer: string | null; strength: Strength | null }
-
-// A guest as the server knows them: their name is their account.
-export type Guest = { name: string; prefs: Partial<Prefs> | null; favourite: Favourite | null }
-
 export type MenuPayload = {
   drinks: Drink[]
   settings: Settings
   categories: string[]       // tab order
   spirits_category: string   // drinks in this category are ordered as spirit + mixer
-  preview_category: string   // the only category the name screen's menu teaser shows (cocktails)
-  mixers: string[]            // base mixers a guest picks from
-  mixer_variants: string[]    // every stored mixer value; bartenders pick from these
-  pref_options: Record<PrefKey, string[]>
-  default_prefs: Prefs
+  mixers: string[]            // what a spirit can come with
+  other_mixer: string         // "Other": the guest types what they want
   strengths: Strength[]       // light/stiff choice, spirits only
-  hot_category: string        // drinks in this category are ordered as drink + sugar
-  sugars: string[]            // the sugar choices; stored in the line's mixer slot
+  fulfilments: Fulfilment[]
 }
+
+export type OrderDetails = { guest_name: string; fulfilment: Fulfilment; table_no: string }
 
 async function req<T>(path: string, init: RequestInit = {}, pin?: string): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init.headers as Record<string, string>) }
@@ -77,28 +69,17 @@ const json = (data: unknown) => JSON.stringify(data)
 
 export const api = {
   menu: () => req<MenuPayload>('/api/menu'),
-  placeOrder: (guest_name: string, device_id: string, items: CartLine[], prefs: Partial<Prefs>) =>
-    req<Order>('/api/orders', { method: 'POST', body: json({ guest_name, device_id, items, prefs }) }),
-  myOrders: (name: string) =>
-    req<{ orders: Order[] }>(`/api/orders/mine?name=${encodeURIComponent(name)}`),
-  ordersFromDevice: (device_id: string) =>
+  placeOrder: (details: OrderDetails, device_id: string, items: CartLine[]) =>
+    req<Order>('/api/orders', { method: 'POST', body: json({ ...details, device_id, items }) }),
+  myOrders: (device_id: string) =>
     req<{ orders: Order[] }>(`/api/orders/mine?device_id=${encodeURIComponent(device_id)}`),
-
-  guests: {
-    lookup: (name: string) => req<{ exists: boolean; name: string }>('/api/guests/lookup', { method: 'POST', body: json({ name }) }),
-    join: (name: string, device_id: string, takeover = false) =>
-      req<Guest>('/api/guests/join', { method: 'POST', body: json({ name, device_id, takeover }) }),
-    me: (name: string) => req<Guest>(`/api/guests/me?name=${encodeURIComponent(name)}`),
-    save: (name: string, patch: { prefs?: Prefs | null; favourite?: Favourite | null }) =>
-      req<Guest>('/api/guests/me', { method: 'PUT', body: json({ name, ...patch }) }),
-  },
 
   bar: {
     login: (pin: string) => req<{ ok: true }>('/api/bar/login', { method: 'POST' }, pin),
     orders: (pin: string, all = false) =>
       req<{ orders: Order[]; settings: Settings; tally: Tally; now: string }>(`/api/bar/orders${all ? '?all=1' : ''}`, {}, pin),
-    placeOrder: (pin: string, guest_name: string, placed_by: string, items: CartLine[]) =>
-      req<Order>('/api/bar/orders', { method: 'POST', body: json({ guest_name, placed_by, items }) }, pin),
+    placeOrder: (pin: string, details: OrderDetails, placed_by: string, items: CartLine[]) =>
+      req<Order>('/api/bar/orders', { method: 'POST', body: json({ ...details, placed_by, items }) }, pin),
     act: (pin: string, id: string, action: string, by: string) =>
       req<Order>(`/api/bar/orders/${id}`, { method: 'PATCH', body: json({ action, by }) }, pin),
     addDrink: (pin: string, drink: { name: string; description: string; category: string; added_by: string; instructions: string }) =>
@@ -113,7 +94,7 @@ export const api = {
 }
 
 export function deviceId(): string {
-  const key = 'aj_device_id'
+  const key = 'rj_device_id'
   try {
     let id = localStorage.getItem(key)
     if (!id) {
@@ -124,16 +105,6 @@ export function deviceId(): string {
   } catch {
     return 'no-storage'
   }
-}
-
-export function storedJson<T>(key: string): T | null {
-  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : null } catch { return null }
-}
-export function storeJson(key: string, value: unknown) {
-  try {
-    if (value === null || value === undefined) localStorage.removeItem(key)
-    else localStorage.setItem(key, JSON.stringify(value))
-  } catch { /* ignore */ }
 }
 
 export function stored(key: string): string {
@@ -150,11 +121,10 @@ export function minutesAgo(iso: string, now = Date.now()): number {
   return Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
 }
 
-export function groupByCategory(drinks: Drink[]): [string, Drink[]][] {
-  const map = new Map<string, Drink[]>()
-  for (const d of drinks) {
-    if (!map.has(d.category)) map.set(d.category, [])
-    map.get(d.category)!.push(d)
-  }
-  return [...map.entries()]
+// "8:43pm"
+export function clockTime(iso: string): string {
+  const d = new Date(iso)
+  const h = d.getHours()
+  const m = d.getMinutes().toString().padStart(2, '0')
+  return `${h % 12 || 12}:${m}${h < 12 ? 'am' : 'pm'}`
 }

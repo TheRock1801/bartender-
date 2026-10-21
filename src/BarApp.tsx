@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, minutesAgo, store, stored, type Drink, type Order, type Settings, type Strength, type Tally } from './api'
-import { bumpCart, cartLines, groupByTab, itemLabel, setStrength, type Cart } from './cart'
-import { CartSummary, DrinkRows } from './DrinkRows'
+import { api, clockTime, minutesAgo, store, stored, type Drink, type Fulfilment, type Order, type Settings, type Strength, type Tally } from './api'
+import { CollectIcon, CoupleNames, DeliverIcon, Glass } from './art'
+import { bumpCart, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { CartSummary, DrinkRows, MixerSheet } from './DrinkRows'
 import { usePoll } from './usePoll'
 
-const PIN_KEY = 'aj_bar_pin'
-const NAME_KEY = 'aj_bar_name'
+const PIN_KEY = 'rj_bar_pin'
+const NAME_KEY = 'rj_bar_name'
 
-// The four of us. Picked from a list rather than typed so names match exactly
-// across phones (claims and "X is on it" labels depend on it).
-export const BARTENDERS = ['Rocky', 'Tussock', 'Ari', 'Todd'] as const
+// Whoever is behind the bar. Picked from a list rather than typed so names match exactly
+// across phones (claims and "X is making it" labels depend on it). Edit for the night.
+export const BARTENDERS = ['Rocky', 'Bartender 2', 'Bartender 3', 'Bartender 4'] as const
 
 export default function BarApp() {
   const [pin, setPin] = useState(() => stored(PIN_KEY))
@@ -47,12 +48,12 @@ function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
   }
   return (
     <main className="min-h-dvh flex items-center justify-center px-6">
-      <form onSubmit={submit} className="card w-full max-w-xs flex flex-col gap-3">
-        <p className="eyebrow">jansen and aria</p>
-        <h1 className="display text-3xl">bar.</h1>
-        <input className="input tracking-widest text-center" inputMode="numeric" autoFocus placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
-        {err && <p className="text-amber text-sm">{err}</p>}
-        <button className="btn-primary" disabled={!pin || busy}>in</button>
+      <form onSubmit={submit} className="card w-full max-w-xs flex flex-col gap-3 p-6">
+        <CoupleNames size="sm" />
+        <h1 className="display text-2xl text-center mt-2">The Bar</h1>
+        <input className="input tracking-[0.4em] text-center" inputMode="numeric" autoFocus placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} />
+        {err && <p className="text-amber text-sm text-center">{err}</p>}
+        <button className="btn-primary" disabled={!pin || busy}>Enter</button>
       </form>
     </main>
   )
@@ -61,15 +62,15 @@ function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
 function NameScreen({ onOk }: { onOk: (name: string) => void }) {
   return (
     <main className="min-h-dvh flex items-center justify-center px-6">
-      <div className="card w-full max-w-xs flex flex-col gap-3">
-        <p className="eyebrow">jansen and aria</p>
-        <h1 className="display text-3xl">who's pouring?</h1>
+      <div className="card w-full max-w-xs flex flex-col gap-3 p-6">
+        <CoupleNames size="sm" />
+        <h1 className="display text-2xl text-center mt-2">Who's pouring?</h1>
         <div className="grid grid-cols-2 gap-2">
           {BARTENDERS.map((n) => (
-            <button key={n} className="btn-soft text-lg py-4" onClick={() => onOk(n)}>{n}</button>
+            <button key={n} className="btn-soft text-base py-4" onClick={() => onOk(n)}>{n}</button>
           ))}
         </div>
-        <p className="text-xs text-cocoa/60">Your phone remembers you. Tap "switch" at the top to change.</p>
+        <p className="text-xs text-stone text-center">Your phone remembers you. Tap "switch" at the top to change.</p>
       </div>
     </main>
   )
@@ -79,7 +80,8 @@ type Tab = 'queue' | 'new' | 'menu'
 
 function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('queue')
-  const queue = usePoll(() => api.bar.orders(pin), 4000, [pin])
+  // The whole night's orders, so the Delivered filter works; one evening's worth is small.
+  const queue = usePoll(() => api.bar.orders(pin, true), 4000, [pin])
   const menu = usePoll(api.menu, 15000)
   const [toast, setToast] = useState('')
   const [openDrinkId, setOpenDrinkId] = useState<string | null>(null)
@@ -93,11 +95,9 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
   const settings = queue.data?.settings
   const drinks = menu.data?.drinks ?? []
   const categories = menu.data?.categories ?? []
-  // Bartenders pick the exact pour (Skinny Coke, Soda…), not the guest-facing base mixer.
-  const mixers = menu.data?.mixer_variants ?? []
+  const mixers = menu.data?.mixers ?? []
+  const otherMixer = menu.data?.other_mixer ?? 'Other'
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
-  const hotCategory = menu.data?.hot_category ?? 'Hot Drinks'
-  const sugars = menu.data?.sugars ?? []
   const strengths = menu.data?.strengths ?? []
   const tally = queue.data?.tally ?? {}
   const newCount = orders.filter((o) => o.status === 'new').length
@@ -126,12 +126,15 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
   return (
     <main className="min-h-dvh pb-24 max-w-lg mx-auto">
-      <header className="px-5 pt-6 pb-3 flex items-end justify-between">
-        <div>
-          <h1 className="display text-3xl">bar.</h1>
-          <p className="font-mono text-xs text-cocoa/60 mt-1">
-            {me.toLowerCase()} · <button className="underline underline-offset-4" onClick={onLogout}>switch</button>
-          </p>
+      <header className="px-5 pt-5 pb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <img src="/art/header.png" alt="" className="w-[88px] h-auto" draggable={false} />
+          <div>
+            <h1 className="script text-[1.9rem]">Riley &amp; Jasmine</h1>
+            <p className="text-xs text-stone">
+              The Bar · {me} · <button className="underline underline-offset-4" onClick={onLogout}>switch</button>
+            </p>
+          </div>
         </div>
         <ChimeToggle />
       </header>
@@ -143,19 +146,19 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
         </div>
       )}
 
-      {queue.error && <p className="mx-4 mt-3 rounded bg-amber text-cream px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing last known queue.</p>}
+      {queue.error && <p className="mx-5 mt-3 rounded-xl bg-amber text-ivory px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing the last known queue.</p>}
 
-      <div className="px-5 mt-5">
+      <div className="px-5 mt-4">
         {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
-        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} spiritsCategory={spiritsCategory} hotCategory={hotCategory} sugars={sugars} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
+        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} otherMixer={otherMixer} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
         {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-cream/95 backdrop-blur border-t border-taupe/30">
+      <nav className="fixed bottom-0 inset-x-0 bg-ivory/95 backdrop-blur border-t border-taupe/70">
         <div className="max-w-lg mx-auto grid grid-cols-3">
-          <TabBtn active={tab === 'queue'} onClick={() => setTab('queue')}>queue{newCount > 0 && <span className="ml-1.5 pill bg-amber text-cream">{newCount}</span>}</TabBtn>
-          <TabBtn active={tab === 'new'} onClick={() => setTab('new')}>+ order</TabBtn>
-          <TabBtn active={tab === 'menu'} onClick={() => setTab('menu')}>menu</TabBtn>
+          <TabBtn active={tab === 'queue'} onClick={() => setTab('queue')}>Orders{newCount > 0 && <span className="ml-1.5 pill bg-amber text-ivory">{newCount}</span>}</TabBtn>
+          <TabBtn active={tab === 'new'} onClick={() => setTab('new')}>+ Order</TabBtn>
+          <TabBtn active={tab === 'menu'} onClick={() => setTab('menu')}>Menu</TabBtn>
         </div>
       </nav>
 
@@ -171,14 +174,14 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
         />
       )}
 
-      {toast && <div className="fixed top-4 inset-x-4 mx-auto max-w-md rounded bg-cocoa text-cream px-4 py-3 text-center font-semibold fade-up">{toast}</div>}
+      {toast && <div className="fixed top-4 inset-x-4 mx-auto max-w-md z-40 rounded-xl bg-espresso text-ivory px-4 py-3 text-center fade-up">{toast}</div>}
     </main>
   )
 }
 
 function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`flex-1 rounded px-3 py-2 font-mono text-xs lowercase border ${on ? 'bg-amber text-cream border-amber' : 'bg-transparent text-cocoa border-taupe/60'}`}>
+    <button onClick={onClick} className={`flex-1 rounded-xl px-3 py-2 text-xs border ${on ? 'bg-amber text-ivory border-amber' : 'bg-transparent text-cocoa border-cocoa/30'}`}>
       {label}
     </button>
   )
@@ -186,106 +189,143 @@ function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: (
 
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={`py-4 font-display font-bold text-base tracking-tight flex items-center justify-center ${active ? 'text-cocoa border-t-2 border-cocoa -mt-px' : 'text-cocoa/50'}`}>
+    <button onClick={onClick} className={`py-4 spaced text-[0.7rem] flex items-center justify-center ${active ? 'text-espresso border-t-2 border-espresso -mt-px' : 'text-stone'}`}>
       {children}
     </button>
   )
 }
 
-// ---- Queue ----
+// ---- Orders ----
+
+type Filter = 'all' | 'new' | 'making' | 'ready' | 'delivered'
 
 function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]; me: string; now?: string; act: (o: Order, a: string) => void; loading: boolean; onShowDrink: (id: string) => void }) {
+  const [filter, setFilter] = useState<Filter>('all')
+  const [expanded, setExpanded] = useState<string | null>(null)
   const nowMs = now ? new Date(now).getTime() : Date.now()
   const open = orders.filter((o) => ['new', 'making', 'ready'].includes(o.status))
-  const grabs = open.filter((o) => o.status === 'new')
-  const mine = open.filter((o) => o.status !== 'new' && o.claimed_by === me)
-  const others = open.filter((o) => o.status !== 'new' && o.claimed_by !== me)
+  const by = (s: Order['status']) => orders.filter((o) => o.status === s)
+  const counts: Record<Filter, number> = { all: open.length, new: by('new').length, making: by('making').length, ready: by('ready').length, delivered: by('delivered').length }
+  const labels: Record<Filter, string> = { all: 'All orders', new: 'New', making: 'Preparing', ready: 'Ready', delivered: 'Delivered' }
+  const list = (filter === 'all' ? open : by(filter)).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
 
-  if (loading) return <p className="text-cocoa/60">Loading…</p>
-  if (!open.length) return <p className="divider pt-8 font-mono text-sm text-cocoa/60">nothing waiting. go mingle.</p>
+  if (loading) return <p className="text-stone">Loading…</p>
 
   return (
-    <div className="flex flex-col gap-6">
-      <Section title={`Up for grabs (${grabs.length})`} empty="All claimed">
-        {grabs.map((o) => (
-          <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
-            <button className="btn-amber flex-1" onClick={() => act(o, 'claim')}>i've got it</button>
-            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>cancel</button>
-          </OrderCard>
+    <div>
+      <div className="flex gap-4 border-b border-taupe/70 overflow-x-auto -mx-5 px-5">
+        {(Object.keys(labels) as Filter[]).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`pb-2.5 -mb-px whitespace-nowrap spaced text-[0.66rem] border-b-2 ${filter === f ? 'border-espresso text-espresso' : 'border-transparent text-stone'}`} aria-pressed={filter === f}>
+            {labels[f]} ({counts[f]})
+          </button>
         ))}
-      </Section>
-      <Section title={`Mine (${mine.length})`} empty="Nothing on the go">
-        {mine.map((o) => (
-          <OrderCard key={o.id} order={o} nowMs={nowMs} onShowDrink={onShowDrink}>
-            {o.status === 'making' && <button className="btn-primary flex-1" onClick={() => act(o, 'ready')}>made it</button>}
-            {o.status === 'ready' && <button className="btn-primary flex-1 !bg-sage" onClick={() => act(o, 'delivered')}>delivered</button>}
-            {o.status === 'making' && <button className="btn-ghost" onClick={() => act(o, 'unclaim')}>put back</button>}
-            <button className="btn-ghost" onClick={() => act(o, 'cancel')}>cancel</button>
-          </OrderCard>
+      </div>
+
+      {!list.length && <p className="pt-8 text-sm text-stone text-center">{filter === 'all' ? 'Nothing waiting. Go mingle.' : 'Nothing here.'}</p>}
+
+      <div className="flex flex-col mt-1">
+        {list.map((o) => (
+          <OrderRow key={o.id} order={o} me={me} nowMs={nowMs} expanded={expanded === o.id} onToggle={() => setExpanded(expanded === o.id ? null : o.id)} act={act} onShowDrink={onShowDrink} />
         ))}
-      </Section>
-      {others.length > 0 && (
-        <Section title={`Others are on it (${others.length})`} empty="">
-          {others.map((o) => (
-            <OrderCard key={o.id} order={o} nowMs={nowMs} muted onShowDrink={onShowDrink}>
-              {o.status === 'ready' && <button className="btn-soft flex-1" onClick={() => act(o, 'delivered')}>i delivered it</button>}
-            </OrderCard>
-          ))}
-        </Section>
-      )}
+      </div>
     </div>
   )
 }
 
-function Section({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
+function StatusPill({ order, me }: { order: Order; me: string }) {
+  const cls: Record<Order['status'], string> = {
+    new: 'bg-sand text-cocoa',
+    making: 'bg-amber text-ivory',
+    ready: 'bg-sage text-ivory',
+    delivered: 'bg-mist text-stone',
+    cancelled: 'bg-mist text-stone line-through',
+  }
+  const text: Record<Order['status'], string> = { new: 'New', making: 'Preparing', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled' }
   return (
-    <section>
-      <h2 className="label mb-2">{title}</h2>
-      <div className="flex flex-col gap-2">
-        {children.length ? children : empty ? <p className="text-sm text-cocoa/50 px-1">{empty}</p> : null}
-      </div>
-    </section>
+    <span className={`pill !px-3 !py-2 !rounded-lg justify-center min-w-[6.2rem] ${cls[order.status]}`}>
+      {text[order.status]}
+      {order.claimed_by && order.status !== 'delivered' && order.status !== 'cancelled' && (
+        <span className="ml-1 opacity-80">· {order.claimed_by === me ? 'you' : order.claimed_by}</span>
+      )}
+      <svg className="ml-1.5 opacity-70" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+    </span>
   )
 }
 
-function OrderCard({ order, nowMs, muted, children, onShowDrink }: { order: Order; nowMs: number; muted?: boolean; children: React.ReactNode; onShowDrink: (id: string) => void }) {
+function OrderRow({ order, me, nowMs, expanded, onToggle, act, onShowDrink }: {
+  order: Order; me: string; nowMs: number; expanded: boolean; onToggle: () => void; act: (o: Order, a: string) => void; onShowDrink: (id: string) => void
+}) {
   const mins = minutesAgo(order.created_at, nowMs)
-  const late = mins >= 10 && order.status !== 'ready'
+  const late = mins >= 10 && ['new', 'making'].includes(order.status)
+  const first = order.items[0]
+  const mineToMake = order.claimed_by === me
+  const othersOnIt = order.claimed_by && !mineToMake && ['making', 'ready'].includes(order.status)
   return (
-    <div className={`card ${muted ? 'opacity-70' : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-display font-bold text-2xl tracking-tight leading-none">{order.guest_name}</div>
-        <span className={`pill ${late ? 'bg-amber text-cream' : 'bg-sand/70 text-cocoa/80'}`}>{mins} min</span>
-      </div>
-      <ul className="mt-1.5 text-lg">
-        {order.items.map((i) => (
-          <li key={i.id}>
-            <span className="font-semibold">{i.qty}×</span>{' '}
-            {i.drink_id ? (
-              <button className="underline decoration-dotted underline-offset-4 text-left" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer, i.strength)}</button>
-            ) : itemLabel(i.drink_name, i.mixer, i.strength)}
-            {i.strength && <span className={`pill ml-2 capitalize ${i.strength === 'stiff' ? 'bg-amber text-cream' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-1 font-mono text-[0.7rem] text-cocoa/50">
-        {order.placed_by ? `Taken by ${order.placed_by}` : 'From the app'}
-        {order.claimed_by && ` · ${order.claimed_by} ${order.status === 'ready' ? 'has it ready' : 'is making it'}`}
-      </div>
-      <div className="mt-3 flex gap-2 items-center">{children}</div>
+    <div className={`row ${othersOnIt ? 'opacity-75' : ''}`}>
+      <button className="w-full flex items-center gap-3 text-left" onClick={onToggle} aria-expanded={expanded}>
+        <div className="w-14 shrink-0">
+          <div className="text-base text-espresso">#{order.order_no}</div>
+          <div className={`text-xs ${late ? 'text-amber' : 'text-stone'}`}>{clockTime(order.created_at)}</div>
+        </div>
+        {first && <Glass name={first.drink_name} size={40} />}
+        <div className="flex-1 min-w-0">
+          <div className="display text-xl leading-tight truncate">{order.guest_name}</div>
+          <div className="text-xs text-stone truncate">
+            {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer, i.strength)).join(', ')}
+          </div>
+        </div>
+        <div className="w-[4.6rem] shrink-0 flex items-center gap-1.5 text-cocoa">
+          {order.fulfilment === 'deliver' ? <DeliverIcon className="w-6 h-6 shrink-0" /> : <CollectIcon className="w-6 h-6 shrink-0" />}
+          <div className="text-[0.68rem] leading-tight">
+            {order.fulfilment === 'deliver' ? <>Deliver<br />Table {order.table_no}</> : <>Collect<br />at bar</>}
+          </div>
+        </div>
+        <StatusPill order={order} me={me} />
+      </button>
+
+      {expanded && (
+        <div className="mt-3 fade-up">
+          <ul className="card py-3 text-base">
+            {order.items.map((i) => (
+              <li key={i.id} className="flex items-center gap-2 py-0.5">
+                <span className="text-stone w-7">{i.qty}×</span>
+                {i.drink_id ? (
+                  <button className="underline decoration-dotted underline-offset-4 text-left text-espresso" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer, i.strength)}</button>
+                ) : <span>{itemLabel(i.drink_name, i.mixer, i.strength)}</span>}
+                {i.strength && <span className={`pill ml-1 capitalize ${i.strength === 'stiff' ? 'bg-amber text-ivory' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
+              </li>
+            ))}
+            <li className="text-xs text-stone pt-2">
+              {order.placed_by ? `Taken by ${order.placed_by}` : 'From the app'} · {mins} min ago
+              {order.claimed_by && ` · ${order.claimed_by} ${order.status === 'ready' ? 'has it ready' : order.status === 'delivered' ? 'delivered it' : 'is making it'}`}
+            </li>
+          </ul>
+          <div className="mt-3 flex gap-2 items-center flex-wrap">
+            {order.status === 'new' && <button className="btn-primary flex-1" onClick={() => act(order, 'claim')}>I've got it</button>}
+            {order.status === 'making' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'ready')}>Ready</button>}
+            {order.status === 'ready' && <button className="btn-dark flex-1" onClick={() => act(order, 'delivered')}>{order.fulfilment === 'deliver' ? 'Delivered' : 'Collected'}</button>}
+            {order.status === 'making' && mineToMake && <button className="btn-ghost" onClick={() => act(order, 'unclaim')}>Put back</button>}
+            {['new', 'making', 'ready'].includes(order.status) && <button className="btn-ghost" onClick={() => act(order, 'cancel')}>Cancel</button>}
+            {['delivered', 'cancelled'].includes(order.status) && <button className="btn-soft flex-1" onClick={() => act(order, 'reopen')}>Reopen</button>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ---- New (verbal) order ----
 
-function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, hotCategory, sugars, strengths, onPlaced, onError }: {
-  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; spiritsCategory: string; hotCategory: string; sugars: string[]; strengths: Strength[]
+function NewOrder({ pin, me, drinks, categories, mixers, otherMixer, spiritsCategory, strengths, onPlaced, onError }: {
+  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; otherMixer: string; spiritsCategory: string; strengths: Strength[]
   onPlaced: (o: Order) => void; onError: (m: string) => void
 }) {
   const [guest, setGuest] = useState('')
+  const [fulfilment, setFulfilment] = useState<Fulfilment>('collect')
+  const [table, setTable] = useState('')
   const [cart, setCart] = useState<Cart>({})
   const [tab, setTab] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState<Drink | null>(null)
   const [busy, setBusy] = useState(false)
   const tabs = groupByTab(drinks, categories)
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
@@ -293,13 +333,13 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, hotCat
   const lines = cartLines(cart)
   const bump = (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) =>
     setCart((c) => bumpCart(c, drink_id, mixer, delta, strength))
-  const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
+  const ready = guest.trim() && lines.length && (fulfilment === 'collect' || table.trim())
 
   const submit = async () => {
     setBusy(true)
     try {
-      onPlaced(await api.bar.placeOrder(pin, guest.trim(), me, lines))
-      setGuest('')
+      onPlaced(await api.bar.placeOrder(pin, { guest_name: guest.trim(), fulfilment, table_no: table.trim() }, me, lines))
+      setGuest(''); setTable('')
       setCart({})
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Did not save')
@@ -309,14 +349,22 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, hotCat
   }
   return (
     <div className="flex flex-col gap-4">
-      <p className="font-mono text-xs text-cocoa/60">someone asked you for a drink? put it in the queue so whoever's at the bar sees it.</p>
+      <p className="text-xs text-stone">Someone asked you for a drink? Put it in the queue so whoever's at the bar sees it.</p>
       <input className="input" placeholder="Whose drink?" value={guest} maxLength={60} onChange={(e) => setGuest(e.target.value)} />
+      <div className="flex gap-2 items-center">
+        {(['collect', 'deliver'] as Fulfilment[]).map((f) => (
+          <button key={f} onClick={() => setFulfilment(f)} className={`rounded-lg border px-3 py-2 text-sm ${fulfilment === f ? 'bg-espresso text-ivory border-espresso' : 'border-cocoa/30 text-cocoa'}`} aria-pressed={fulfilment === f}>
+            {f === 'collect' ? 'Collect at bar' : 'Deliver to table'}
+          </button>
+        ))}
+        {fulfilment === 'deliver' && <input className="input !w-24 !py-2" placeholder="Table" inputMode="numeric" value={table} maxLength={12} onChange={(e) => setTable(e.target.value)} />}
+      </div>
 
       {tabs.length > 0 && (
-        <div className="flex gap-6 border-b border-taupe/30 overflow-x-auto">
+        <div className="flex gap-4 border-b border-taupe/70 overflow-x-auto">
           {tabs.map(([cat]) => (
-            <button key={cat} onClick={() => setTab(cat)} className={`pb-2 -mb-px whitespace-nowrap font-display font-bold text-base tracking-tight border-b-2 ${activeTab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}>
-              {cat.toLowerCase()}
+            <button key={cat} onClick={() => setTab(cat)} className={`pb-2 -mb-px whitespace-nowrap spaced text-[0.66rem] border-b-2 ${activeTab === cat ? 'border-espresso text-espresso' : 'border-transparent text-stone'}`}>
+              {cat}
             </button>
           ))}
         </div>
@@ -327,22 +375,30 @@ function NewOrder({ pin, me, drinks, categories, mixers, spiritsCategory, hotCat
           drinks={activeDrinks}
           cart={cart}
           onBump={bump}
-          onStrength={strengthFor}
+          onChoose={setChoosing}
           isSpirit={activeTab === spiritsCategory}
-          isHot={activeTab === hotCategory}
-          mixers={mixers}
-          sugars={sugars}
-          strengths={activeTab === spiritsCategory ? strengths : []}
           canOrder={() => true}
           compact
         />
       )}
 
-      {lines.length > 0 && <CartSummary cart={cart} drinks={drinks} onBump={bump} label={itemLabel} />}
+      {lines.length > 0 && <CartSummary cart={cart} drinks={drinks} onBump={bump} />}
 
-      <button className="btn-primary text-lg" disabled={!guest.trim() || !lines.length || busy} onClick={submit}>
-        {busy ? 'adding…' : 'add to queue'}
+      <button className="btn-primary text-lg" disabled={!ready || busy} onClick={submit}>
+        {busy ? 'Adding…' : 'Add to queue'}
       </button>
+
+      {choosing && (
+        <MixerSheet
+          drink={choosing}
+          mixers={mixers}
+          otherMixer={otherMixer}
+          strengths={strengths}
+          cart={cart}
+          onAdd={(mixer, strength) => { bump(choosing.id, mixer, 1, strength); setChoosing(null) }}
+          onClose={() => setChoosing(null)}
+        />
+      )}
     </div>
   )
 }
@@ -355,7 +411,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
   const [instructions, setInstructions] = useState('')
   const [cat, setCat] = useState('Cocktails')
   const [busy, setBusy] = useState(false)
-  const cats = categories.length ? categories : ['Spirits', 'Cocktails', 'Beer & Wine', 'Soft Drinks', 'Hot Drinks']
+  const cats = categories.length ? categories : ['Spirits', 'Cocktails', 'Beer & Wine', 'Non-alcoholic']
 
   const add = async () => {
     setBusy(true)
@@ -368,12 +424,12 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-2 divider pt-5">
-        <h2 className="display text-2xl mb-1">add a drink.</h2>
-        <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Gin)' : cat === 'Beer & Wine' ? 'e.g. Speights, Rosé' : cat === 'Hot Drinks' ? 'e.g. Hot chocolate' : 'Name (e.g. Espresso Martini)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+      <section className="flex flex-col gap-2">
+        <h2 className="display text-2xl mb-1">Add a drink</h2>
+        <input className="input" placeholder={cat === 'Spirits' ? 'Spirit (e.g. Tequila)' : cat === 'Beer & Wine' ? 'e.g. Rosé, Pale ale' : cat === 'Non-alcoholic' ? 'e.g. Ginger beer' : 'Name (e.g. Negroni)'} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="What's in it (optional)" value={desc} maxLength={120} onChange={(e) => setDesc(e.target.value)} />
         <textarea
-          className="input min-h-[7rem] text-base"
+          className="input min-h-[7rem]"
           placeholder={"How to make it (optional)\ne.g. 50ml bourbon, sugar cube, 2 dashes bitters. Stir over ice, orange peel."}
           value={instructions}
           maxLength={2000}
@@ -381,26 +437,26 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
         />
         <div className="flex gap-2 flex-wrap">
           {cats.map((c) => (
-            <button key={c} onClick={() => setCat(c)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${cat === c ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60 text-cocoa'}`}>{c.toLowerCase()}</button>
+            <button key={c} onClick={() => setCat(c)} className={`rounded-lg border px-3 py-1.5 text-xs ${cat === c ? 'bg-espresso text-ivory border-espresso' : 'border-cocoa/30 text-cocoa'}`}>{c}</button>
           ))}
         </div>
-        {cat === 'Spirits' && <p className="text-xs text-cocoa/60">Guests pick the mixer themselves (rocks, Coke, lemonade, juice & lemonade, water, soda, ginger beer, tonic), so just the spirit's name here.</p>}
-        {cat === 'Hot Drinks' && <p className="text-xs text-cocoa/60">Guests pick the sugar themselves (none, 1 or 2), so just the drink's name here.</p>}
-        <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'adding…' : 'add to menu'}</button>
+        {cat === 'Spirits' && <p className="text-xs text-stone">Guests choose the mixer themselves, so just the spirit's name here.</p>}
+        <button className="btn-primary" disabled={!name.trim() || busy} onClick={add}>{busy ? 'Adding…' : 'Add to menu'}</button>
       </section>
 
       <section>
-        <h2 className="display text-2xl mb-1">on the menu.</h2>
-        <p className="label mb-2">tap a drink for the recipe</p>
+        <h2 className="display text-2xl mb-1">On the menu</h2>
+        <p className="label mb-2">Tap a drink for the recipe</p>
         <div className="flex flex-col">
           {drinks.map((d) => (
-            <button key={d.id} onClick={() => onShowDrink(d.id)} className={`text-left flex items-center gap-3 row w-full ${d.available ? '' : 'opacity-60'}`}>
+            <button key={d.id} onClick={() => onShowDrink(d.id)} className={`text-left flex items-center gap-3 row py-3 w-full ${d.available ? '' : 'opacity-60'}`}>
+              <Glass name={d.name} size={36} />
               <div className="flex-1 min-w-0">
-                <div className="font-semibold">{d.name}</div>
-                <div className="font-mono text-[0.7rem] text-cocoa/50">{d.category.toLowerCase()}{d.description && ` · ${d.description}`}{!d.instructions && ' · no recipe yet'}</div>
+                <div className="text-base text-espresso">{d.name}</div>
+                <div className="text-xs text-stone">{d.category}{d.description && ` · ${d.description}`}{!d.instructions && ' · no recipe yet'}</div>
               </div>
-              <span className="pill bg-sand/70 text-cocoa/80" title="Ordered tonight">{tally[d.id] || 0} ordered</span>
-              <span className={`pill ${d.available ? 'bg-sage/20 text-sage' : 'bg-sand/70 text-cocoa/80'}`}>{d.available ? 'Available' : 'Run out'}</span>
+              <span className="pill bg-sand text-stone" title="Ordered tonight">{tally[d.id] || 0} ordered</span>
+              <span className={`pill ${d.available ? 'bg-sage/20 text-sage' : 'bg-mist text-stone'}`}>{d.available ? 'Available' : 'Run out'}</span>
             </button>
           ))}
         </div>
@@ -435,30 +491,33 @@ function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError
 
   return (
     <div className="fixed inset-0 z-20 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={drink.name}>
-      <button className="absolute inset-0 bg-cocoa/40" onClick={onClose} aria-label="Close" />
-      <div className="relative w-full max-w-lg bg-cream rounded-t-lg sm:rounded-lg border border-taupe/40 p-6 pb-8 max-h-[90dvh] overflow-y-auto fade-up">
+      <button className="absolute inset-0 bg-espresso/40" onClick={onClose} aria-label="Close" />
+      <div className="relative w-full max-w-lg sheet rounded-b-none sm:rounded-b-2xl p-6 pb-8 max-h-[90dvh] overflow-y-auto fade-up">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="font-display font-extrabold text-3xl tracking-tightest leading-none">{drink.name}</h2>
-            <p className="font-mono text-xs text-cocoa/60 mt-2">{drink.category.toLowerCase()}{drink.description && ` · ${drink.description}`}</p>
+          <div className="min-w-0 flex items-center gap-3">
+            <Glass name={drink.name} size={52} />
+            <div>
+              <h2 className="display text-3xl leading-none">{drink.name}</h2>
+              <p className="text-xs text-stone mt-1.5">{drink.category}{drink.description && ` · ${drink.description}`}</p>
+            </div>
           </div>
-          <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={onClose} aria-label="Close">×</button>
+          <button className="btn-soft w-10 h-10 !px-0 !py-0 text-xl shrink-0" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div className="mt-4 flex gap-2 flex-wrap">
-          <span className="pill bg-amber/15 text-amber !text-xs !px-3 !py-1">{ordered} ordered tonight</span>
-          <span className={`pill !text-xs !px-3 !py-1 ${drink.available ? 'bg-sage/20 text-sage' : 'bg-sand/70 text-cocoa/80'}`}>{drink.available ? 'Available' : 'Run out'}</span>
+          <span className="pill bg-amber/15 text-amber">{ordered} ordered tonight</span>
+          <span className={`pill ${drink.available ? 'bg-sage/20 text-sage' : 'bg-mist text-stone'}`}>{drink.available ? 'Available' : 'Run out'}</span>
         </div>
 
         <section className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="label">how to make it</h3>
-            {!editing && <button className="btn-ghost !py-0 font-mono text-xs lowercase" onClick={() => setEditing(true)}>edit</button>}
+            <h3 className="label">How to make it</h3>
+            {!editing && <button className="btn-ghost !py-0 text-xs" onClick={() => setEditing(true)}>Edit</button>}
           </div>
           {editing ? (
             <div className="flex flex-col gap-2">
               <textarea
-                className="input min-h-[9rem] text-base"
+                className="input min-h-[9rem]"
                 autoFocus
                 placeholder={"Measures, method, glass, garnish.\ne.g. 50ml bourbon, sugar cube, 2 dashes bitters. Stir over ice, orange peel."}
                 value={text}
@@ -466,27 +525,27 @@ function DrinkSheet({ pin, drink, ordered, onClose, onChange, onRemoved, onError
                 onChange={(e) => setText(e.target.value)}
               />
               <div className="flex gap-2">
-                <button className="btn-primary flex-1" disabled={busy} onClick={save}>{busy ? 'saving…' : 'save recipe'}</button>
-                {drink.instructions && <button className="btn-ghost" onClick={() => { setText(drink.instructions); setEditing(false) }}>cancel</button>}
+                <button className="btn-primary flex-1" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save recipe'}</button>
+                {drink.instructions && <button className="btn-ghost" onClick={() => { setText(drink.instructions); setEditing(false) }}>Cancel</button>}
               </div>
             </div>
           ) : (
-            <p className="card whitespace-pre-wrap text-lg leading-relaxed">{drink.instructions}</p>
+            <p className="rounded-xl bg-cream p-4 whitespace-pre-wrap text-base leading-relaxed">{drink.instructions}</p>
           )}
         </section>
 
         <div className="mt-6 flex gap-2 items-center">
-          <button className="btn-soft flex-1" disabled={busy} onClick={toggle}>{drink.available ? 'mark run out' : 'back on the menu'}</button>
+          <button className="btn-soft flex-1" disabled={busy} onClick={toggle}>{drink.available ? 'Mark run out' : 'Back on the menu'}</button>
           {confirmRemove ? (
             <>
-              <button className="btn-primary !bg-amber" disabled={busy} onClick={remove}>{busy ? 'removing…' : 'yes, remove'}</button>
-              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>keep</button>
+              <button className="btn-primary" disabled={busy} onClick={remove}>{busy ? 'Removing…' : 'Yes, remove'}</button>
+              <button className="btn-ghost" onClick={() => setConfirmRemove(false)}>Keep</button>
             </>
           ) : (
-            <button className="btn-ghost text-amber" onClick={() => setConfirmRemove(true)}>remove</button>
+            <button className="btn-ghost text-amber" onClick={() => setConfirmRemove(true)}>Remove</button>
           )}
         </div>
-        {confirmRemove && <p className="font-mono text-xs text-cocoa/60 mt-2">takes it off the menu for good. past orders keep the name.</p>}
+        {confirmRemove && <p className="text-xs text-stone mt-2">Takes it off the menu for good. Past orders keep the name.</p>}
       </div>
     </div>
   )
@@ -519,7 +578,7 @@ function ChimeToggle() {
     beep()
   }
   return (
-    <button onClick={toggle} className={`rounded w-11 h-11 inline-flex items-center justify-center border ${on ? 'bg-amber text-cream border-amber' : 'bg-transparent text-cocoa border-taupe/60'}`} aria-label="Toggle new-order chime" aria-pressed={on} title="Chime on new orders">
+    <button onClick={toggle} className={`rounded-xl w-11 h-11 inline-flex items-center justify-center border shrink-0 ${on ? 'bg-amber text-ivory border-amber' : 'bg-transparent text-cocoa border-cocoa/30'}`} aria-label="Toggle new-order chime" aria-pressed={on} title="Chime on new orders">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
         <path d="M10 20a2 2 0 0 0 4 0" />

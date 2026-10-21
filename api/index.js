@@ -2,7 +2,7 @@
 // also mounted by server.js for local dev.
 
 import express from 'express'
-import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, PREVIEW_CATEGORY, HOT_CATEGORY, SUGARS, MIXERS, MIXER_VARIANTS, PREF_OPTIONS, DEFAULT_PREFS, normalisePrefs, resolveMixer, STRENGTHS } from '../lib/store.js'
+import { storeFromEnv, OPEN_STATUSES, ORDER_STATUSES, CATEGORIES, SPIRITS_CATEGORY, MIXERS, OTHER_MIXER, isValidMixer, STRENGTHS, FULFILMENTS } from '../lib/store.js'
 
 export function buildApp(store, { barPin }) {
   const app = express()
@@ -15,42 +15,35 @@ export function buildApp(store, { barPin }) {
     const [drinks, settings] = await Promise.all([store.listDrinks(), store.getSettings()])
     return {
       drinks, settings,
-      categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY, preview_category: PREVIEW_CATEGORY, mixers: MIXERS,
-      mixer_variants: MIXER_VARIANTS, pref_options: PREF_OPTIONS, default_prefs: DEFAULT_PREFS,
-      strengths: STRENGTHS, hot_category: HOT_CATEGORY, sugars: SUGARS,
+      categories: CATEGORIES, spirits_category: SPIRITS_CATEGORY,
+      mixers: MIXERS, other_mixer: OTHER_MIXER, strengths: STRENGTHS, fulfilments: FULFILMENTS,
     }
   }
 
   // Normalise a submitted items list against the current menu. Returns {items} or {error}.
-  // A guest's base mixer (Coke / Lemonade) is resolved with their flavour prefs;
-  // a bartender can send the resolved variant directly. A hot drink's sugar choice
-  // travels in the same `mixer` slot and must be one of SUGARS.
-  async function resolveItems(rawItems, { requireAvailable, prefs = {} }) {
-    if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'pick something first' }
+  // A spirit needs a mixer (one of MIXERS, or "Other: <what they typed>"); nothing else takes one.
+  async function resolveItems(rawItems, { requireAvailable }) {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return { error: 'Pick a drink first' }
     const drinks = await store.listDrinks()
     const byId = new Map(drinks.map((d) => [d.id, d]))
     const merged = new Map()
     for (const it of rawItems) {
       const d = byId.get(it?.drink_id)
-      if (!d) return { error: "one of those just came off the menu, sorry" }
-      if (requireAvailable && !d.available) return { error: `${d.name}'s all gone, sorry` }
+      if (!d) return { error: 'One of those just came off the menu, sorry' }
+      if (requireAvailable && !d.available) return { error: `${d.name} has run out, sorry` }
       const qty = Math.min(10, Math.max(1, Math.floor(Number(it.qty) || 1)))
       let mixer = null
       if (d.category === SPIRITS_CATEGORY) {
-        mixer = str(it.mixer, 30)
-        if (MIXERS.includes(mixer)) mixer = resolveMixer(mixer, prefs)
-        else if (!MIXER_VARIANTS.includes(mixer)) return { error: `what do you want with your ${d.name}?` }
-      } else if (d.category === HOT_CATEGORY) {
-        mixer = str(it.mixer, 30)
-        if (!SUGARS.includes(mixer)) return { error: `sugar in your ${d.name}?` }
+        mixer = str(it.mixer, 48).replace(/\s+/g, ' ')
+        if (!isValidMixer(mixer)) return { error: `What would you like with your ${d.name}?` }
       } else if (it.mixer) {
         return { error: `${d.name} doesn't take a mixer` }
       }
       let strength = null
       if (it.strength) {
         strength = str(it.strength, 10).toLowerCase()
-        if (!STRENGTHS.includes(strength)) return { error: 'pour is light or stiff' }
-        if (d.category !== SPIRITS_CATEGORY) return { error: 'light or stiff is just for spirits' }
+        if (!STRENGTHS.includes(strength)) return { error: 'Pour is light or stiff' }
+        if (d.category !== SPIRITS_CATEGORY) return { error: 'Light or stiff is just for spirits' }
       }
       const key = d.id + '|' + (mixer || '') + '|' + (strength || '')
       merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, strength, qty: (merged.get(key)?.qty || 0) + qty })
@@ -58,63 +51,16 @@ export function buildApp(store, { barPin }) {
     return { items: [...merged.values()] }
   }
 
+  // Collect from the bar (default) or deliver to a table, which needs a table number.
+  function resolveFulfilment(body) {
+    const fulfilment = str(body?.fulfilment, 10).toLowerCase() || 'collect'
+    if (!FULFILMENTS.includes(fulfilment)) return { error: 'Collect from the bar, or deliver to your table?' }
+    const table_no = str(body?.table_no, 12)
+    if (fulfilment === 'deliver' && !table_no) return { error: 'Which table are you at?' }
+    return { fulfilment, table_no: fulfilment === 'deliver' ? table_no : null }
+  }
+
   // ---- Guest routes (no auth) ----
-
-  // Guests are their name. Lookup says whether a name is taken; join creates it or, with
-  // takeover, re-links an existing name to this phone (logged out, new phone). A different
-  // person with the same first name is expected to add a last-name initial client-side.
-  const publicGuest = (g) => ({ name: g.name, prefs: g.prefs || null, favourite: g.favourite || null })
-
-  app.post('/api/guests/lookup', async (req, res, next) => {
-    try {
-      const name = str(req.body?.name)
-      if (!name) return bad(res, 400, 'need your name first')
-      const g = await store.getGuest(name)
-      res.json({ exists: !!g, name: g ? g.name : name })
-    } catch (e) { next(e) }
-  })
-
-  app.post('/api/guests/join', async (req, res, next) => {
-    try {
-      const name = str(req.body?.name)
-      const device_id = str(req.body?.device_id, 80)
-      if (!name) return bad(res, 400, 'need your name first')
-      if (!device_id) return bad(res, 400, 'Missing device id')
-      const existing = await store.getGuest(name)
-      if (existing && !req.body?.takeover) return res.status(409).json({ error: 'name_taken', name: existing.name })
-      const g = existing ? await store.updateGuest(name, { device_id }) : await store.createGuest({ name, device_id })
-      res.status(existing ? 200 : 201).json(publicGuest(g))
-    } catch (e) { next(e) }
-  })
-
-  app.get('/api/guests/me', async (req, res, next) => {
-    try {
-      const name = str(req.query.name)
-      if (!name) return bad(res, 400, 'Missing name')
-      const g = await store.getGuest(name)
-      if (!g) return bad(res, 404, 'Guest not found')
-      res.json(publicGuest(g))
-    } catch (e) { next(e) }
-  })
-
-  app.put('/api/guests/me', async (req, res, next) => {
-    try {
-      const name = str(req.body?.name)
-      if (!name) return bad(res, 400, 'Missing name')
-      const patch = {}
-      if ('prefs' in (req.body || {})) patch.prefs = req.body.prefs === null ? null : normalisePrefs(req.body.prefs)
-      if ('favourite' in (req.body || {})) {
-        const f = req.body.favourite
-        patch.favourite = f && typeof f === 'object' && typeof f.drink_id === 'string'
-          ? { drink_id: str(f.drink_id, 80), mixer: f.mixer ? str(f.mixer, 30) : null, strength: STRENGTHS.includes(f.strength) ? f.strength : null }
-          : null
-      }
-      if (!Object.keys(patch).length) return bad(res, 400, 'Nothing to change')
-      const g = await store.updateGuest(name, patch)
-      if (!g) return bad(res, 404, 'Guest not found')
-      res.json(publicGuest(g))
-    } catch (e) { next(e) }
-  })
 
   app.get('/api/menu', async (_req, res, next) => {
     try { res.json(await menuPayload()) } catch (e) { next(e) }
@@ -124,23 +70,24 @@ export function buildApp(store, { barPin }) {
     try {
       const guest_name = str(req.body?.guest_name)
       const device_id = str(req.body?.device_id, 80)
-      if (!guest_name) return bad(res, 400, 'need your name first')
+      if (!guest_name) return bad(res, 400, 'Pop your name in first')
       if (!device_id) return bad(res, 400, 'Missing device id')
       const settings = await store.getSettings()
-      if (!settings.ordering_open) return bad(res, 409, "bar's taking a breather, try again in a few")
-      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true, prefs: normalisePrefs(req.body?.prefs) })
+      if (!settings.ordering_open) return bad(res, 409, "The bar's taking a short break, try again in a few minutes")
+      const f = resolveFulfilment(req.body)
+      if (f.error) return bad(res, 400, f.error)
+      const { items, error } = await resolveItems(req.body?.items, { requireAvailable: true })
       if (error) return bad(res, 400, error)
-      const order = await store.createOrder({ guest_name, device_id, items })
+      const order = await store.createOrder({ guest_name, device_id, fulfilment: f.fulfilment, table_no: f.table_no, items })
       res.status(201).json(order)
     } catch (e) { next(e) }
   })
 
   app.get('/api/orders/mine', async (req, res, next) => {
     try {
-      const guest_name = str(req.query.name)
       const device_id = str(req.query.device_id, 80)
-      if (!guest_name && !device_id) return bad(res, 400, 'Missing name')
-      const orders = await store.listOrders(guest_name ? { guest_name } : { device_id })
+      if (!device_id) return bad(res, 400, 'Missing device id')
+      const orders = await store.listOrders({ device_id })
       res.json({ orders: orders.slice(-20).reverse() })
     } catch (e) { next(e) }
   })
@@ -176,9 +123,11 @@ export function buildApp(store, { barPin }) {
       const placed_by = str(req.body?.placed_by)
       if (!guest_name) return bad(res, 400, 'Whose drink is it?')
       if (!placed_by) return bad(res, 400, 'Missing bartender name')
+      const f = resolveFulfilment(req.body)
+      if (f.error) return bad(res, 400, f.error)
       const { items, error } = await resolveItems(req.body?.items, { requireAvailable: false })
       if (error) return bad(res, 400, error)
-      const order = await store.createOrder({ guest_name, placed_by, items })
+      const order = await store.createOrder({ guest_name, placed_by, fulfilment: f.fulfilment, table_no: f.table_no, items })
       res.status(201).json(order)
     } catch (e) { next(e) }
   })

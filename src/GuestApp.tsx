@@ -1,459 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api, deviceId, minutesAgo, store, stored, storeJson, storedJson, type Drink, type Favourite, type Guest, type MenuPayload, type Order, type PrefKey, type Prefs, type Strength } from './api'
-import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, resolveMixer, setStrength, type Cart } from './cart'
-import { CartSummary, DrinkRows } from './DrinkRows'
+import { useMemo, useState } from 'react'
+import { api, deviceId, minutesAgo, store, stored, type Drink, type Fulfilment, type Order, type Strength } from './api'
+import { BackArrow, Check, CollectIcon, CoupleNames, DeliverIcon, Glass, HeaderArt } from './art'
+import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, type Cart } from './cart'
+import { CartSummary, DrinkRows, MixerSheet } from './DrinkRows'
 import { usePoll } from './usePoll'
 
-const NAME_KEY = 'aj_guest_name'
-const PREFS_KEY = 'aj_prefs'
-const FAV_KEY = 'aj_fav'
+const NAME_KEY = 'rj_guest_name'
+const FULFILMENT_KEY = 'rj_fulfilment'
+const TABLE_KEY = 'rj_table'
 
-const DEFAULT_PREFS: Prefs = { coke: 'fat' }
-const fullPrefs = (p: Partial<Prefs> | null | undefined): Prefs | null => (p ? { ...DEFAULT_PREFS, ...p } : null)
-
+// Guest flow, as on the mood board: the bar menu → (spirit) choose your mixer → your order
+// (collect or deliver, your name) → placed. No sign-in: the name is asked for with the order
+// and remembered on the phone.
 export default function GuestApp() {
   const device = useMemo(deviceId, [])
-  const [name, setName] = useState(() => stored(NAME_KEY))
-  // The phone keeps a copy for instant load; the server copy (keyed by name) wins when it answers.
-  const [prefs, setPrefs] = useState<Prefs | null>(() => storedJson<Prefs>(PREFS_KEY))
-  const [fav, setFav] = useState<Favourite | null>(() => storedJson<Favourite>(FAV_KEY))
-  const [editingFlavour, setEditingFlavour] = useState(false)
-
-  const applyGuest = (gst: Guest) => {
-    store(NAME_KEY, gst.name); setName(gst.name)
-    const p = fullPrefs(gst.prefs)
-    storeJson(PREFS_KEY, p); setPrefs(p)
-    storeJson(FAV_KEY, gst.favourite); setFav(gst.favourite)
-  }
-
-  // Returning phone: refresh from the server. A name that predates the guest registry is registered now.
-  useEffect(() => {
-    if (!name) return
-    let alive = true
-    api.guests.me(name)
-      .catch((e: Error & { status?: number }) => (e.status === 404 ? api.guests.join(name, device, true) : Promise.reject(e)))
-      .then((gst) => { if (alive) applyGuest(gst) })
-      .catch(() => { /* offline: keep the phone's copy */ })
-    return () => { alive = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name])
-
-  if (!name) return <Join device={device} onJoin={applyGuest} />
-  if (!prefs || editingFlavour) {
-    return (
-      <Flavour
-        name={name}
-        prefs={prefs}
-        fav={fav}
-        onDone={(p, f) => {
-          storeJson(PREFS_KEY, p); setPrefs(p)
-          storeJson(FAV_KEY, f); setFav(f)
-          setEditingFlavour(false)
-          api.guests.save(name, { prefs: p, favourite: f }).catch(() => { /* phone copy still applies */ })
-        }}
-      />
-    )
-  }
-  return (
-    <Menu
-      name={name}
-      prefs={prefs}
-      fav={fav}
-      onChangeName={() => { store(NAME_KEY, ''); setName('') }}
-      onEditFlavour={() => setEditingFlavour(true)}
-    />
-  )
-}
-
-function Header() {
-  return (
-    <div className="w-full">
-      <p className="eyebrow">jansen and aria · drinks</p>
-      <h1 className="display text-[2.75rem] mt-2">aria &amp; jansen.</h1>
-    </div>
-  )
-}
-
-// ---- Step 1: name ----
-
-function Join({ device, onJoin }: { device: string; onJoin: (guest: Guest) => void }) {
-  const [value, setValue] = useState('')
-  const [initial, setInitial] = useState('')
-  // taken: a guest with this name already exists. Either it's them (logged out, new phone) or another person.
-  const [taken, setTaken] = useState<{ name: string; addInitial: boolean } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const menu = usePoll(api.menu, 30000)
-  const mine = usePoll(() => api.ordersFromDevice(device), 15000, [device])
-  // The teaser before a name is typed shows cocktails only (2026-10-13): spirits, mixers,
-  // beer, wine and soft drinks only appear on the real menu once the guest is in.
-  const groups = groupByTab(menu.data?.drinks ?? [], menu.data?.categories ?? [])
-    .filter(([cat, list]) => cat === menu.data?.preview_category && list.length)
-  const recent = (mine.data?.orders ?? []).slice(0, 5)
-
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true); setErr('')
-    try { await fn() } catch (e) { setErr(e instanceof Error ? e.message : "that didn't go through, give it another go") } finally { setBusy(false) }
-  }
-  // Try a name: new -> join straight away; taken -> ask.
-  const tryName = (n: string) => run(async () => {
-    const found = await api.guests.lookup(n)
-    if (found.exists) { setTaken({ name: found.name, addInitial: false }); return }
-    onJoin(await api.guests.join(n, device))
-  })
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const n = value.trim()
-    if (n) tryName(n)
-  }
-  const itsMe = () => taken && run(async () => onJoin(await api.guests.join(taken.name, device, true)))
-  const withInitial = (e: React.FormEvent) => {
-    e.preventDefault()
-    const i = initial.trim().replace(/[^a-z]/gi, '').slice(0, 1).toUpperCase()
-    if (taken && i) tryName(`${taken.name} ${i}`)
-  }
-
-  return (
-    <main className="min-h-dvh flex flex-col px-6 pt-12 pb-12 max-w-lg mx-auto">
-      <Header />
-      {!taken ? (
-        <form onSubmit={submit} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
-          <label className="display text-2xl" htmlFor="guest-name">what's your name?</label>
-          <input
-            id="guest-name"
-            className="input"
-            autoFocus
-            autoComplete="given-name"
-            placeholder="e.g. Sam"
-            value={value}
-            maxLength={60}
-            onChange={(e) => setValue(e.target.value)}
-          />
-          <button className="btn-primary text-lg" disabled={!value.trim() || busy}>{busy ? 'one sec…' : "let's drink"}</button>
-          {err && <p className="font-mono text-xs text-amber">{err}</p>}
-          <p className="text-sm text-cocoa/60">that's all you need. pop it in on any phone and we'll know it's you.</p>
-        </form>
-      ) : !taken.addInitial ? (
-        <section className="w-full mt-10 flex flex-col gap-4 divider pt-6">
-          <h2 className="display text-2xl">there's already a {taken.name} here.</h2>
-          <p className="text-sm text-cocoa/60">is that you?</p>
-          <button className="btn-primary text-lg" disabled={busy} onClick={itsMe}>{busy ? 'one sec…' : "yes, that's me"}</button>
-          <button className="btn-soft" disabled={busy} onClick={() => setTaken({ ...taken, addInitial: true })}>nah, different {taken.name}</button>
-          <button className="btn-ghost self-start px-0 font-mono text-xs lowercase" onClick={() => { setTaken(null); setErr('') }}>← back</button>
-          {err && <p className="font-mono text-xs text-amber">{err}</p>}
-        </section>
-      ) : (
-        <form onSubmit={withInitial} className="w-full mt-10 flex flex-col gap-4 divider pt-6">
-          <label className="display text-2xl" htmlFor="guest-initial">chuck in your last initial.</label>
-          <p className="text-sm text-cocoa/60">so we don't mix you two up. you'll be {taken.name} {initial.trim().slice(0, 1).toUpperCase() || '_'}.</p>
-          <input
-            id="guest-initial"
-            className="input uppercase tracking-widest"
-            autoFocus
-            placeholder="B"
-            value={initial}
-            maxLength={1}
-            onChange={(e) => setInitial(e.target.value)}
-          />
-          <button className="btn-primary text-lg" disabled={!initial.trim() || busy}>{busy ? 'one sec…' : "let's drink"}</button>
-          <button type="button" className="btn-ghost self-start px-0 font-mono text-xs lowercase" onClick={() => { setTaken({ ...taken, addInitial: false }); setErr('') }}>← back</button>
-          {err && <p className="font-mono text-xs text-amber">{err}</p>}
-        </form>
-      )}
-
-      {recent.length > 0 && (
-        <section className="w-full mt-10 divider pt-6">
-          <h2 className="display text-2xl mb-3">recent orders from this phone.</h2>
-          <div className="flex flex-col gap-2">
-            {recent.map((o) => <GuestOrderCard key={o.id} order={o} />)}
-          </div>
-        </section>
-      )}
-
-      <section className="w-full mt-10 divider pt-6">
-        <h2 className="display text-2xl mb-3">on the menu tonight.</h2>
-        {!menu.data && !menu.error && <p className="text-cocoa/60">one sec…</p>}
-        {menu.error && !menu.data && <p className="text-cocoa/60">can't reach the bar right now.</p>}
-        {groups.map(([cat, list]) => (
-          <div key={cat} className="mb-5">
-            <h3 className="label mb-1">{cat.toLowerCase()}</h3>
-            <div className="flex flex-col">
-              {list.map((d) => (
-                <div key={d.id} className={`row ${d.available ? '' : 'opacity-60'}`}>
-                  <div className="font-semibold leading-tight">{d.name}</div>
-                  {d.description && <div className="text-sm text-cocoa/60">{d.description}</div>}
-                  {!d.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">all gone, sorry</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {menu.data && groups.length === 0 && <p className="text-cocoa/60">still stocking the bar, back soon.</p>}
-      </section>
-
-      <a href="/bar" className="btn-ghost mt-12 text-sm self-start px-0 font-mono lowercase">bartender login →</a>
-    </main>
-  )
-}
-
-// ---- Step 2: flavour + favourite ----
-
-const PREF_LABELS: Record<PrefKey, { title: string; options: [string, string] }> = {
-  coke: { title: 'coke', options: ['fat', 'skinny'] },
-}
-
-function Flavour({ name, prefs, fav, onDone }: {
-  name: string
-  prefs: Prefs | null
-  fav: Favourite | null
-  onDone: (prefs: Prefs, fav: Favourite | null) => void
-}) {
-  const menu = usePoll(api.menu, 30000)
-  const [draft, setDraft] = useState<Prefs>(prefs ?? DEFAULT_PREFS)
-  const [favDraft, setFavDraft] = useState<Favourite | null>(fav)
-  const [picking, setPicking] = useState(false)
-  const drinks = menu.data?.drinks ?? []
-  const favDrink = favDraft ? drinks.find((d) => d.id === favDraft.drink_id) : undefined
-
-  return (
-    <main className="min-h-dvh flex flex-col px-6 pt-12 pb-12 max-w-lg mx-auto">
-      <Header />
-      <section className="mt-10 divider pt-6">
-        <p className="eyebrow">hey {name}</p>
-        <h2 className="display text-3xl mt-2">what's your flavour?</h2>
-        <p className="text-sm text-cocoa/60 mt-2">so we don't have to ask every time.</p>
-
-        <div className="mt-6 flex flex-col gap-5">
-          {(Object.keys(PREF_LABELS) as PrefKey[]).map((k) => (
-            <div key={k}>
-              <p className="label mb-2">{PREF_LABELS[k].title}</p>
-              <Slide
-                options={PREF_LABELS[k].options}
-                value={draft[k]}
-                onChange={(v) => setDraft((d) => ({ ...d, [k]: v as Prefs[PrefKey] }))}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10 divider pt-6">
-        <h2 className="display text-3xl">add your favourite.</h2>
-        <p className="text-sm text-cocoa/60 mt-2">your usual, one tap, top of the menu.</p>
-
-        {favDraft && favDrink && !picking ? (
-          <div className="card mt-5 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="label">your favourite</p>
-              <p className="font-display font-bold text-xl tracking-tight mt-1">{itemLabel(favDrink.name, resolveMixer(favDraft.mixer, draft), favDraft.strength)}</p>
-            </div>
-            <button className="btn-soft py-2" onClick={() => setPicking(true)}>change</button>
-          </div>
-        ) : picking || !favDraft ? (
-          menu.data ? (
-            <FavouritePicker
-              menu={menu.data}
-              prefs={draft}
-              initial={favDraft}
-              onPick={(f) => { setFavDraft(f); setPicking(false) }}
-              onCancel={favDraft ? () => setPicking(false) : undefined}
-            />
-          ) : (
-            <p className="font-mono text-sm text-cocoa/60 mt-4">loading the menu…</p>
-          )
-        ) : null}
-      </section>
-
-      <div className="mt-10 flex flex-col gap-3">
-        <button className="btn-primary text-lg" onClick={() => onDone(draft, favDraft)}>
-          {favDraft ? 'sweet, show me the menu' : 'nah, just show me the menu'}
-        </button>
-      </div>
-    </main>
-  )
-}
-
-// Two-option slide toggle: one row, a soft indicator slides under the chosen side.
-function Slide({ options, value, onChange }: { options: [string, string]; value: string; onChange: (v: string) => void }) {
-  const idx = options.indexOf(value)
-  return (
-    <div className="relative grid grid-cols-2 rounded border border-taupe/60 p-1 select-none" role="radiogroup">
-      <div
-        className="absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded bg-cocoa transition-transform duration-200 ease-out"
-        style={{ transform: `translateX(${idx <= 0 ? 0 : 'calc(100% + 0.25rem)'})`, left: '0.25rem' }}
-        aria-hidden="true"
-      />
-      {options.map((o) => (
-        <button
-          key={o}
-          role="radio"
-          aria-checked={value === o}
-          onClick={() => onChange(o)}
-          className={`relative z-10 py-2.5 font-mono text-sm lowercase transition-colors ${value === o ? 'text-cream' : 'text-cocoa/70'}`}
-        >
-          {o}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// Pick one drink (plus mixer and pour for a spirit) as the favourite.
-function FavouritePicker({ menu, prefs, initial, onPick, onCancel }: {
-  menu: MenuPayload
-  prefs: Prefs
-  initial: Favourite | null
-  onPick: (f: Favourite) => void
-  onCancel?: () => void
-}) {
-  const tabs = groupByTab(menu.drinks, menu.categories)
-  const initialDrink = initial ? menu.drinks.find((d) => d.id === initial.drink_id) : undefined
-  const [tab, setTab] = useState<string>(initialDrink?.category ?? tabs[0]?.[0] ?? '')
-  const [drinkId, setDrinkId] = useState<string | null>(initial?.drink_id ?? null)
-  const [mixer, setMixer] = useState<string | null>(initial?.mixer ?? null)
-  const [strength, setStrengthPick] = useState<Strength | null>(initial?.strength ?? null)
-  const drink = menu.drinks.find((d) => d.id === drinkId)
-  const isSpirit = drink?.category === menu.spirits_category
-  // A hot drink's favourite keeps its sugar choice in the mixer slot, like the order line does.
-  const isHot = drink?.category === menu.hot_category
-  const takesMixer = isSpirit || isHot
-  const ready = !!drink && (!takesMixer || !!mixer)
-  const list = tabs.find(([c]) => c === tab)?.[1] ?? []
-
-  return (
-    <div className="mt-5 flex flex-col gap-4">
-      <div className="flex gap-6 border-b border-taupe/30 overflow-x-auto">
-        {tabs.map(([cat]) => (
-          <button key={cat} onClick={() => setTab(cat)} className={`pb-2 -mb-px whitespace-nowrap font-display font-bold text-base tracking-tight border-b-2 ${tab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}>
-            {cat.toLowerCase()}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {list.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => { setDrinkId(d.id); if (d.category !== menu.spirits_category) { setMixer(null); setStrengthPick(null) } }}
-            className={`rounded border px-3 py-2 font-semibold text-sm ${drinkId === d.id ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`}
-          >
-            {d.name}
-          </button>
-        ))}
-        {!list.length && <p className="font-mono text-sm text-cocoa/60">nothing here yet.</p>}
-      </div>
-
-      {drink && isSpirit && (
-        <>
-          <div>
-            <p className="label mb-2">pour</p>
-            <div className="flex items-center gap-2">
-              {menu.strengths.map((st) => (
-                <button key={st} onClick={() => setStrengthPick(strength === st ? null : st)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${strength === st ? 'bg-amber text-cream border-amber' : 'border-taupe/60'}`} aria-pressed={strength === st}>{st}</button>
-              ))}
-              {!strength && <span className="font-mono text-xs text-cocoa/50">regular</span>}
-            </div>
-          </div>
-          <div>
-            <p className="label mb-2">{drink.name} with…</p>
-            <div className="flex flex-wrap gap-2">
-              {menu.mixers.map((m) => (
-                <button key={m} onClick={() => setMixer(m)} className={`rounded border px-3 py-2 font-mono text-xs lowercase ${mixer === m ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`} aria-pressed={mixer === m}>
-                  {m === 'Rocks' ? 'on the rocks' : (resolveMixer(m, prefs) ?? m).toLowerCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {drink && isHot && (
-        <div>
-          <p className="label mb-2">sugar?</p>
-          <div className="flex flex-wrap gap-2">
-            {menu.sugars.map((s) => (
-              <button key={s} onClick={() => setMixer(s)} className={`rounded border px-3 py-2 font-mono text-xs lowercase ${mixer === s ? 'bg-cocoa text-cream border-cocoa' : 'border-taupe/60'}`} aria-pressed={mixer === s}>
-                {s.toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        <button className="btn-primary flex-1" disabled={!ready} onClick={() => drink && onPick({ drink_id: drink.id, mixer: takesMixer ? mixer : null, strength: isSpirit ? strength : null })}>
-          {drink ? `save ${itemLabel(drink.name, takesMixer ? resolveMixer(mixer, prefs) : null, isSpirit ? strength : null).toLowerCase()}` : 'pick a drink'}
-        </button>
-        {onCancel && <button className="btn-soft" onClick={onCancel}>cancel</button>}
-      </div>
-    </div>
-  )
-}
-
-// ---- Step 3: the menu ----
-
-function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
-  name: string
-  prefs: Prefs
-  fav: Favourite | null
-  onChangeName: () => void
-  onEditFlavour: () => void
-}) {
-  const device = useMemo(deviceId, [])
   const menu = usePoll(api.menu, 15000)
-  const mine = usePoll(() => api.myOrders(name), 5000, [name])
+  const mine = usePoll(() => api.myOrders(device), 5000, [device])
   const [cart, setCart] = useState<Cart>({})
   const [tab, setTab] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [review, setReview] = useState(false)
+  const [choosing, setChoosing] = useState<Drink | null>(null)
+  const [ordering, setOrdering] = useState(false)
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const drinks = menu.data?.drinks ?? []
   const settings = menu.data?.settings
   const categories = menu.data?.categories ?? []
-  const mixers = menu.data?.mixers ?? []
   const spiritsCategory = menu.data?.spirits_category ?? 'Spirits'
-  const hotCategory = menu.data?.hot_category ?? 'Hot Drinks'
-  const sugars = menu.data?.sugars ?? []
-  const strengths = menu.data?.strengths ?? []
   const tabs = groupByTab(drinks, categories)
   const activeTab = tabs.find(([c]) => c === tab)?.[0] ?? tabs[0]?.[0] ?? null
   const activeDrinks = tabs.find(([c]) => c === activeTab)?.[1] ?? []
   const count = cartCount(cart)
   const open = settings?.ordering_open !== false
-  const favDrink: Drink | undefined = fav ? drinks.find((d) => d.id === fav.drink_id) : undefined
-
-  // Labels show the guest's own flavour ("Bourbon & Skinny Coke"); the order stores the base mixer
-  // and the server resolves it the same way from the prefs we send.
-  const label = (n: string, mixer: string | null, strength: Strength | null) => itemLabel(n, resolveMixer(mixer, prefs), strength)
-  const mixerLabel = (m: string) => resolveMixer(m, prefs) ?? m
 
   const bump = (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) =>
     setCart((c) => bumpCart(c, drink_id, mixer, delta, strength))
-  // Changing the pour moves every line of that spirit already in the order.
-  const strengthFor = (drink_id: string, st: Strength | null) => setCart((c) => setStrength(c, drink_id, st))
 
   const flash = (kind: 'ok' | 'err', text: string) => {
     setToast({ kind, text })
-    setTimeout(() => setToast(null), 3500)
-  }
-
-  const placeOrder = async () => {
-    const lines = cartLines(cart)
-    if (!lines.length || busy) return
-    setBusy(true)
-    try {
-      const order = await api.placeOrder(name, device, lines, prefs)
-      setCart({})
-      setReview(false)
-      mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
-      flash('ok', "on it! we'll find you.")
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (e) {
-      flash('err', e instanceof Error ? e.message : "that didn't go through, give it another go")
-      menu.refresh()
-    } finally {
-      setBusy(false)
-    }
+    setTimeout(() => setToast(null), 4000)
   }
 
   const orders = mine.data?.orders ?? []
@@ -461,68 +45,41 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
   const doneOrders = orders.filter((o) => !['new', 'making', 'ready'].includes(o.status)).slice(0, 3)
 
   return (
-    <main className="min-h-dvh pb-28 px-6 pt-8 max-w-lg mx-auto">
-      <Header />
-      <p className="mt-4 font-mono text-sm text-cocoa/70">
-        hey {name}.{' '}
-        <button className="underline underline-offset-4" onClick={onChangeName}>log out</button>
-        {' · '}
-        <button className="underline underline-offset-4" onClick={onEditFlavour}>your flavour</button>
-      </p>
+    <main className="min-h-dvh pb-28 px-5 pt-6 max-w-lg mx-auto">
+      <HeaderArt />
+      <div className="mt-2"><CoupleNames /></div>
 
-      {settings?.last_orders && (
-        <Banner tone="amber">last orders! get 'em in.</Banner>
-      )}
-      {!open && (
-        <Banner tone="cocoa">bar's taking a breather, back in a few.</Banner>
-      )}
-      {menu.error && !menu.data && (
-        <Banner tone="cocoa">can't reach the bar right now, dodgy signal probably. hang about.</Banner>
-      )}
+      <div className="divider mt-8 pt-7 text-center">
+        <h2 className="script text-[2.6rem]">the bar</h2>
+        <p className="spaced text-sm text-cocoa mt-2">Drinks are on us</p>
+      </div>
 
-      {fav && favDrink && (
-        <section className="mt-8 divider pt-5">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="label">your favourite</p>
-              <p className="font-display font-extrabold text-2xl tracking-tightest mt-1">{label(favDrink.name, fav.mixer, fav.strength)}</p>
-              {!favDrink.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">all gone, sorry</span>}
-            </div>
-            <button
-              className="btn-primary px-5"
-              disabled={!favDrink.available || !open}
-              onClick={() => bump(favDrink.id, fav.mixer, 1, fav.strength)}
-            >
-              add one
-            </button>
-          </div>
-          <button className="btn-ghost px-0 mt-1 font-mono text-xs lowercase" onClick={onEditFlavour}>change favourite</button>
-        </section>
-      )}
+      {settings?.last_orders && <Banner tone="amber">Last orders! Get them in.</Banner>}
+      {!open && <Banner tone="dark">The bar's taking a short break, back in a few minutes.</Banner>}
+      {menu.error && !menu.data && <Banner tone="dark">Can't reach the bar right now, probably the signal. Hang about.</Banner>}
 
       {openOrders.length > 0 && (
-        <section className="mt-8 divider pt-5">
-          <h2 className="display text-2xl mb-3">your drinks.</h2>
+        <section className="mt-8">
+          <h3 className="label mb-3">Your drinks</h3>
           <div className="flex flex-col gap-2">
             {openOrders.map((o) => <GuestOrderCard key={o.id} order={o} />)}
           </div>
         </section>
       )}
 
-      <section className="mt-8 divider pt-5">
-        <h2 className="display text-2xl mb-3">menu.</h2>
-        {!menu.data && !menu.error && <p className="text-cocoa/60">one sec…</p>}
+      <section className="mt-8">
+        {!menu.data && !menu.error && <p className="text-stone text-center">One moment…</p>}
 
         {tabs.length > 0 && (
-          <div className="flex gap-6 border-b border-taupe/30 mb-5 overflow-x-auto">
+          <div className="flex gap-5 border-b border-taupe/70 overflow-x-auto">
             {tabs.map(([cat]) => (
               <button
                 key={cat}
                 onClick={() => setTab(cat)}
-                className={`pb-2 -mb-px whitespace-nowrap font-display font-bold text-lg tracking-tight border-b-2 transition ${activeTab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}
+                className={`pb-2.5 -mb-px whitespace-nowrap spaced text-[0.7rem] border-b-2 transition ${activeTab === cat ? 'border-espresso text-espresso' : 'border-transparent text-stone'}`}
                 aria-pressed={activeTab === cat}
               >
-                {cat.toLowerCase()}
+                {cat}
               </button>
             ))}
           </div>
@@ -530,24 +87,16 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
 
         {activeTab && (
           <>
-            {activeTab === spiritsCategory && activeDrinks.length > 0 && (
-              <p className="font-mono text-xs text-cocoa/60 mb-3">pick a spirit, then what you want with it.</p>
-            )}
-            {activeTab === hotCategory && activeDrinks.length > 0 && (
-              <p className="font-mono text-xs text-cocoa/60 mb-3">pick your drink, then how much sugar.</p>
-            )}
+            <p className="text-sm text-stone mt-5 mb-1">
+              {activeTab === spiritsCategory ? 'Pick a spirit, then choose your mixer.' : `Tap Add for anything you'd like.`}
+            </p>
             <DrinkRows
               key={activeTab}
               drinks={activeDrinks}
               cart={cart}
               onBump={bump}
-              onStrength={strengthFor}
+              onChoose={setChoosing}
               isSpirit={activeTab === spiritsCategory}
-              isHot={activeTab === hotCategory}
-              mixers={mixers}
-              sugars={sugars}
-              mixerLabel={mixerLabel}
-              strengths={activeTab === spiritsCategory ? strengths : []}
               canOrder={(d) => d.available && open}
             />
           </>
@@ -555,53 +104,61 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
       </section>
 
       {doneOrders.length > 0 && (
-        <section className="mt-8 divider pt-5">
-          <h2 className="display text-2xl mb-3">earlier.</h2>
+        <section className="mt-8">
+          <h3 className="label mb-3">Earlier</h3>
           <div className="flex flex-col gap-2 opacity-70">
             {doneOrders.map((o) => <GuestOrderCard key={o.id} order={o} />)}
           </div>
         </section>
       )}
 
-      {count > 0 && open && !review && (
+      <p className="mt-12 text-center text-xs text-stone">Nothing to pay. Just order and we'll sort the rest.</p>
+      <a href="/bar" className="block mt-6 text-center text-xs text-stone/70 underline underline-offset-4">Bar staff</a>
+
+      {count > 0 && open && !ordering && !choosing && (
         <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">
-          <div className="max-w-lg mx-auto flex gap-2 fade-up">
-            <button
-              className="btn-soft px-4 text-lg font-mono !bg-cream"
-              onClick={() => setReview(true)}
-              aria-label={`Review your ${count} drink${count === 1 ? '' : 's'}`}
-            >
-              +{count}
-            </button>
-            <button className="btn-primary flex-1 text-lg" onClick={placeOrder} disabled={busy}>
-              {busy ? 'sending…' : 'complete order'}
+          <div className="max-w-lg mx-auto fade-up">
+            <button className="btn-primary w-full text-lg" onClick={() => setOrdering(true)}>
+              View your order · {count} {count === 1 ? 'drink' : 'drinks'}
+              <span className="ml-2" aria-hidden="true">›</span>
             </button>
           </div>
         </div>
       )}
 
-      {review && (
-        <div className="fixed inset-0 z-20 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Your order">
-          <button className="absolute inset-0 bg-cocoa/40" onClick={() => setReview(false)} aria-label="Close" />
-          <div className="relative w-full max-w-lg bg-cream rounded-t-lg border border-taupe/40 p-6 pb-8 max-h-[85dvh] overflow-y-auto fade-up">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <h2 className="display text-3xl">your order.</h2>
-              <button className="btn-soft w-10 h-10 !px-0 text-xl shrink-0" onClick={() => setReview(false)} aria-label="Close">×</button>
-            </div>
-            <CartSummary cart={cart} drinks={drinks} onBump={bump} label={label} title="" />
-            <p className="font-mono text-xs text-cocoa/60 mt-3">tap − to drop one.</p>
-            <div className="mt-5 flex gap-2">
-              <button className="btn-soft" onClick={() => setReview(false)}>add more</button>
-              <button className="btn-primary flex-1 text-lg" onClick={placeOrder} disabled={busy || count === 0 || !open}>
-                {busy ? 'sending…' : count === 0 ? 'nothing in here' : 'complete order'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {choosing && menu.data && (
+        <MixerSheet
+          drink={choosing}
+          mixers={menu.data.mixers}
+          otherMixer={menu.data.other_mixer}
+          strengths={menu.data.strengths}
+          cart={cart}
+          onAdd={(mixer, strength) => { bump(choosing.id, mixer, 1, strength); setChoosing(null) }}
+          onClose={() => setChoosing(null)}
+        />
+      )}
+
+      {ordering && (
+        <OrderSheet
+          cart={cart}
+          drinks={drinks}
+          device={device}
+          open={open}
+          onBump={bump}
+          onClose={() => setOrdering(false)}
+          onPlaced={(order) => {
+            setCart({})
+            setOrdering(false)
+            mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
+            flash('ok', order.fulfilment === 'deliver' ? `Order #${order.order_no} is in. We'll bring it to table ${order.table_no}.` : `Order #${order.order_no} is in. We'll call you when it's ready at the bar.`)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          onError={(m) => { flash('err', m); menu.refresh() }}
+        />
       )}
 
       {toast && (
-        <div className={`fixed top-4 inset-x-4 mx-auto max-w-md rounded px-4 py-3 text-center font-semibold fade-up ${toast.kind === 'ok' ? 'bg-sage text-cream' : 'bg-amber text-cream'}`}>
+        <div className={`fixed top-4 inset-x-4 mx-auto max-w-md z-40 rounded-xl px-4 py-3 text-center fade-up ${toast.kind === 'ok' ? 'bg-sage text-ivory' : 'bg-amber text-ivory'}`}>
           {toast.text}
         </div>
       )}
@@ -609,35 +166,136 @@ function Menu({ name, prefs, fav, onChangeName, onEditFlavour }: {
   )
 }
 
-function Banner({ tone, children }: { tone: 'amber' | 'cocoa'; children: React.ReactNode }) {
-  const cls = tone === 'amber' ? 'bg-amber text-cream' : 'bg-taupe text-cream'
-  return <div className={`mt-5 rounded px-4 py-3 font-medium ${cls}`}>{children}</div>
+// ---- Your order ----
+
+function OrderSheet({ cart, drinks, device, open, onBump, onClose, onPlaced, onError }: {
+  cart: Cart
+  drinks: Drink[]
+  device: string
+  open: boolean
+  onBump: (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) => void
+  onClose: () => void
+  onPlaced: (o: Order) => void
+  onError: (m: string) => void
+}) {
+  const [name, setName] = useState(() => stored(NAME_KEY))
+  const [fulfilment, setFulfilment] = useState<Fulfilment>(() => (stored(FULFILMENT_KEY) === 'deliver' ? 'deliver' : 'collect'))
+  const [table, setTable] = useState(() => stored(TABLE_KEY))
+  const [busy, setBusy] = useState(false)
+  const count = cartCount(cart)
+  const ready = count > 0 && name.trim().length > 0 && (fulfilment === 'collect' || table.trim().length > 0) && open
+
+  const place = async () => {
+    if (!ready || busy) return
+    setBusy(true)
+    try {
+      const details = { guest_name: name.trim(), fulfilment, table_no: table.trim() }
+      store(NAME_KEY, details.guest_name); store(FULFILMENT_KEY, fulfilment); store(TABLE_KEY, details.table_no)
+      onPlaced(await api.placeOrder(details, device, cartLines(cart)))
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "That didn't go through, give it another go")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 bg-cream overflow-y-auto" role="dialog" aria-modal="true" aria-label="Your order">
+      <main className="min-h-dvh max-w-lg mx-auto px-5 pt-3 pb-12">
+        <BackArrow onClick={onClose} label="Back to the menu" />
+        <HeaderArt className="max-w-[260px] -mt-4" />
+        <h2 className="script text-[2.9rem] text-center mt-1">Your Order</h2>
+
+        <div className="mt-6">
+          <CartSummary cart={cart} drinks={drinks} onBump={onBump} />
+          {count === 0 && <button className="btn-soft mt-3" onClick={onClose}>Back to the menu</button>}
+        </div>
+
+        <h3 className="text-lg text-espresso mt-8">How would you like your drink?</h3>
+        <div className="grid grid-cols-2 gap-3 mt-3" role="radiogroup">
+          <FulfilmentCard
+            selected={fulfilment === 'collect'}
+            onPick={() => setFulfilment('collect')}
+            icon={<CollectIcon />}
+            title="Collect from bar"
+            sub="I'll pick it up at the bar"
+          />
+          <FulfilmentCard
+            selected={fulfilment === 'deliver'}
+            onPick={() => setFulfilment('deliver')}
+            icon={<DeliverIcon />}
+            title="Deliver to my table"
+            sub="Bring it to me"
+          />
+        </div>
+        {fulfilment === 'deliver' && (
+          <div className="mt-4 fade-up">
+            <label className="text-lg text-espresso block mb-2" htmlFor="table-no">Table number</label>
+            <input id="table-no" className="input" placeholder="e.g. 4" inputMode="numeric" value={table} maxLength={12} onChange={(e) => setTable(e.target.value)} />
+          </div>
+        )}
+
+        <label className="text-lg text-espresso block mt-6 mb-2" htmlFor="guest-name">Your name</label>
+        <input id="guest-name" className="input" placeholder="e.g. Sarah" autoComplete="given-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+
+        <button className="btn-primary w-full text-lg mt-6" disabled={!ready || busy} onClick={place}>
+          {busy ? 'Sending…' : !open ? 'Ordering is paused' : 'Place order — it’s on us!'}
+          {!busy && open && <span className="ml-2" aria-hidden="true">›</span>}
+        </button>
+        {!name.trim() && count > 0 && <p className="text-xs text-stone text-center mt-2">Pop your name in so we know whose drink it is.</p>}
+      </main>
+    </div>
+  )
+}
+
+function FulfilmentCard({ selected, onPick, icon, title, sub }: { selected: boolean; onPick: () => void; icon: React.ReactNode; title: string; sub: string }) {
+  return (
+    <button
+      onClick={onPick}
+      role="radio"
+      aria-checked={selected}
+      className={`card relative flex flex-col items-center text-center gap-1 py-5 border ${selected ? 'border-amber' : 'border-transparent'}`}
+    >
+      <span className={`absolute top-2.5 right-2.5 ring-radio w-5 h-5 ${selected ? 'bg-amber border-amber text-ivory' : ''}`}>{selected && <Check />}</span>
+      <span className="text-cocoa">{icon}</span>
+      <span className="text-base text-espresso mt-1 leading-tight">{title}</span>
+      <span className="text-xs text-stone leading-snug">{sub}</span>
+    </button>
+  )
+}
+
+function Banner({ tone, children }: { tone: 'amber' | 'dark'; children: React.ReactNode }) {
+  const cls = tone === 'amber' ? 'bg-amber text-ivory' : 'bg-espresso text-ivory'
+  return <div className={`mt-6 rounded-xl px-4 py-3 text-center ${cls}`}>{children}</div>
 }
 
 function GuestOrderCard({ order }: { order: Order }) {
+  const where = order.fulfilment === 'deliver' ? `table ${order.table_no}` : 'the bar'
   const label: Record<Order['status'], string> = {
-    new: 'in the queue',
-    making: order.claimed_by ? `${order.claimed_by}'s on it` : 'being made',
-    ready: order.claimed_by ? `done, ${order.claimed_by}'s bringing it over` : 'done, coming your way',
-    delivered: 'sorted. cheers!',
-    cancelled: 'cancelled',
+    new: 'In the queue',
+    making: order.claimed_by ? `${order.claimed_by} is making it` : 'Being made',
+    ready: order.fulfilment === 'deliver' ? `On its way to ${where}` : 'Ready to collect at the bar',
+    delivered: 'Delivered. Enjoy!',
+    cancelled: 'Cancelled',
   }
   const tone: Record<Order['status'], string> = {
     new: 'bg-sand text-cocoa',
-    making: 'bg-amber/20 text-amber',
-    ready: 'bg-sage/20 text-sage',
-    delivered: 'bg-sand/70 text-cocoa/80',
-    cancelled: 'bg-sand/70 text-cocoa/80',
+    making: 'bg-amber text-ivory',
+    ready: 'bg-sage text-ivory',
+    delivered: 'bg-mist text-stone',
+    cancelled: 'bg-mist text-stone',
   }
+  const first = order.items[0]
   return (
-    <div className="card">
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-semibold">
+    <div className="card flex items-center gap-3">
+      {first && <Glass name={first.drink_name} size={44} />}
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-stone">#{order.order_no} · {minutesAgo(order.created_at)} min ago · {order.fulfilment === 'deliver' ? `Table ${order.table_no}` : 'Collect at bar'}</div>
+        <div className="text-base text-espresso leading-snug mt-0.5">
           {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer, i.strength)).join(', ')}
         </div>
-        <span className="text-xs text-cocoa/50 whitespace-nowrap">{minutesAgo(order.created_at)} min ago</span>
+        <span className={`pill mt-2 ${tone[order.status]}`}>{label[order.status]}</span>
       </div>
-      <span className={`pill mt-2 ${tone[order.status]}`}>{label[order.status]}</span>
     </div>
   )
 }

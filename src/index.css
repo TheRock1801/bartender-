@@ -4,25 +4,24 @@
 
 /* ---- Base ---- */
 html, body {
-  @apply bg-cream text-cocoa antialiased font-sans;
+  @apply bg-cream text-cocoa antialiased font-sans font-light;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Very subtle paper grain over the page background, kept off text by sitting
-   behind everything at low opacity. Disabled on devices that ask for less motion/texture. */
+/* A very faint paper grain behind everything, like printed stationery. */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.35;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.26 0 0 0 0 0.21 0 0 0 0 0.18 0 0 0 0.09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.25;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.29 0 0 0 0 0.23 0 0 0 0 0.18 0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 /* Visible keyboard focus, no focus ring on mouse/touch. */
 :focus-visible {
-  outline: 2px solid #42362F;
+  outline: 2px solid #9B5233;
   outline-offset: 2px;
 }
 
@@ -41,29 +40,37 @@ body::before {
 
 @layer components {
   /* Type */
-  .display { @apply font-display font-extrabold lowercase tracking-tightest leading-[0.95]; }
-  .label { @apply font-mono text-[0.7rem] tracking-[0.12em] uppercase text-cocoa/60; }
-  .eyebrow { @apply font-mono text-xs tracking-[0.08em] lowercase text-cocoa/70; }
+  .script { @apply font-script font-normal text-espresso leading-none; }
+  .display { @apply font-display font-medium text-espresso leading-tight; }
+  .label { @apply font-sans font-normal text-[0.68rem] tracking-[0.2em] uppercase text-stone; }
+  .spaced { @apply font-sans font-normal tracking-[0.28em] uppercase; }
 
-  /* Buttons: solid, softly squared, no shadow */
+  /* Buttons: softly rounded, no shadow */
   .btn {
-    @apply inline-flex items-center justify-center rounded px-4 py-3 font-semibold transition active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100 select-none;
+    @apply inline-flex items-center justify-center rounded-xl px-5 py-3.5 font-sans font-normal text-base transition active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100 select-none;
   }
-  .btn-primary { @apply btn bg-cocoa text-cream; }
-  .btn-amber { @apply btn bg-amber text-cream; }
-  .btn-soft { @apply btn bg-transparent text-cocoa border border-cocoa/70; }
-  .btn-ghost { @apply btn bg-transparent text-cocoa/70 underline-offset-4 hover:underline; }
+  .btn-primary { @apply btn bg-amber text-ivory; }
+  .btn-dark { @apply btn bg-espresso text-ivory; }
+  .btn-soft { @apply btn bg-transparent text-cocoa border border-cocoa/40; }
+  .btn-ghost { @apply btn bg-transparent text-stone underline-offset-4 hover:underline; }
 
-  /* Surfaces: ivory with a fine taupe rule, no shadow */
-  .card { @apply rounded bg-cream border border-taupe/40 p-4; }
-  .row { @apply border-b border-taupe/30 py-3 last:border-b-0; }
-  .divider { @apply border-t border-taupe/30; }
+  /* Surfaces: lighter cream blocks on the cream page, hairline rows inside */
+  .card { @apply rounded-2xl bg-ivory p-4; }
+  .sheet { @apply rounded-2xl bg-ivory; }
+  .row { @apply border-b border-taupe/60 py-4 last:border-b-0; }
+  .divider { @apply border-t border-taupe/70; }
 
   /* Forms */
-  .input { @apply w-full rounded border border-taupe/60 bg-cream px-4 py-3 text-lg text-cocoa placeholder:text-cocoa/40 outline-none focus:border-cocoa; }
+  .input { @apply w-full rounded-xl border border-taupe bg-ivory px-4 py-3.5 text-base text-cocoa placeholder:text-stone/70 outline-none focus:border-cocoa font-sans; }
 
-  /* Small labels, monospace */
-  .pill { @apply inline-flex items-center rounded-sm px-2 py-0.5 font-mono text-[0.68rem] tracking-[0.06em] uppercase; }
+  /* Small status labels */
+  .pill { @apply inline-flex items-center rounded-lg px-2.5 py-1 font-sans text-[0.72rem] tracking-[0.04em]; }
+
+  /* Radio ring used on the mixer list */
+  .ring-radio { @apply w-6 h-6 rounded-full border border-cocoa/40 shrink-0 inline-flex items-center justify-center; }
+
+  /* Stepper (− 1 +) */
+  .step-btn { @apply w-8 h-8 rounded-lg border border-cocoa/30 inline-flex items-center justify-center text-base leading-none text-cocoa; }
 
   .fade-up { animation: fade-up 220ms ease-out both; }
 }
