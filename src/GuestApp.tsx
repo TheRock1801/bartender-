@@ -41,8 +41,10 @@ export default function GuestApp() {
   }
 
   const orders = mine.data?.orders ?? []
-  const openOrders = orders.filter((o) => ['new', 'making', 'ready'].includes(o.status))
-  const doneOrders = orders.filter((o) => !['new', 'making', 'ready'].includes(o.status)).slice(0, 3)
+  // A made drink stays under "Your drinks" for a few minutes so the guest sees it's done, then moves to Earlier.
+  const recent = (o: Order) => Date.now() - new Date(o.updated_at).getTime() < 5 * 60000
+  const openOrders = orders.filter((o) => ['new', 'making', 'ready'].includes(o.status) || (o.status === 'delivered' && recent(o)))
+  const doneOrders = orders.filter((o) => !openOrders.includes(o)).slice(0, 3)
 
   return (
     <main className="min-h-dvh pb-28 px-5 pt-6 max-w-lg mx-auto">
@@ -270,19 +272,19 @@ function Banner({ tone, children }: { tone: 'amber' | 'dark'; children: React.Re
 }
 
 function GuestOrderCard({ order }: { order: Order }) {
-  const where = order.fulfilment === 'deliver' ? `table ${order.table_no}` : 'the bar'
+  const made = order.fulfilment === 'deliver' ? `Made, on its way to table ${order.table_no}` : 'Made, come grab it at the bar'
   const label: Record<Order['status'], string> = {
     new: 'In the queue',
-    making: order.claimed_by ? `${order.claimed_by} is making it` : 'Being made',
-    ready: order.fulfilment === 'deliver' ? `On its way to ${where}` : 'Ready to collect at the bar',
-    delivered: 'Delivered. Enjoy!',
+    making: 'Being made',
+    ready: made,
+    delivered: made,
     cancelled: 'Cancelled',
   }
   const tone: Record<Order['status'], string> = {
     new: 'bg-sand text-cocoa',
     making: 'bg-amber text-ivory',
     ready: 'bg-sage text-ivory',
-    delivered: 'bg-mist text-stone',
+    delivered: 'bg-sage text-ivory',
     cancelled: 'bg-mist text-stone',
   }
   const first = order.items[0]

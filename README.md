@@ -2,8 +2,8 @@
 
 Phone-based drink ordering for a wedding. Guests scan a QR code, pick a drink, say whether
 they'll collect it from the bar or want it brought to their table, pop their name in, done.
-Whoever is behind the bar sees one live, numbered queue on their own phones, claims orders so
-nobody doubles up, and marks them ready and delivered.
+Whoever is behind the bar sees one live, numbered queue on their own phones and taps each
+order through New → Preparing → Made.
 
 Was the Aria & Jansen bartender app; written over and restyled to Riley and Jasmine's mood board.
 
@@ -11,8 +11,8 @@ Was the Aria & Jansen bartender app; written over and restyled to Riley and Jasm
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Juice with a flavour, Other with a note, On the rocks, plus an optional light/stiff pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order — it's on us!". Live status of your drinks sits at the top. |
-| `/bar` | Bartenders | Shared PIN, then pick your name. Orders tab with All / New / Preparing / Ready / Delivered filters, order numbers, time, drink, collect-or-table and a status pill; tap a row for the actions (I've got it, Ready, Delivered, Put back, Cancel, Reopen). + Order for verbal orders, Menu to add drinks, recipes, mark run out, pause ordering, call last orders. |
+| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Juice with a flavour, Other with a note, On the rocks, plus an optional light pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order — it's on us!". Live status of your drinks sits at the top. |
+| `/bar` | Bartenders | Shared PIN, that's it. Orders tab with All / New / Preparing / Made filters, order numbers, time, drink, collect-or-table and a status pill; tap a row for the actions (Making it, Made it, Put back, Cancel, Reopen). + Order for verbal orders, Menu to add drinks, recipes, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
 
@@ -43,7 +43,6 @@ Already wired up from the first wedding: pushing to `main` deploys on Vercel, wh
 
 ## On the night
 
-- Edit `BARTENDERS` in `src/BarApp.tsx` to the real names before the day (the names are picked from a list so claims match across phones).
 - Tap the bell on the bar screen once so your phone chimes on new orders (browsers need a tap before they'll play sound).
 - "Pause ordering" when the queue gets silly. Guests see a banner and the order button goes away.
 - "Call last orders" puts a banner on every guest's phone. Ordering stays open until you pause it.

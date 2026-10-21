@@ -42,8 +42,8 @@ export function buildApp(store, { barPin }) {
       let strength = null
       if (it.strength) {
         strength = str(it.strength, 10).toLowerCase()
-        if (!STRENGTHS.includes(strength)) return { error: 'Pour is light or stiff' }
-        if (d.category !== SPIRITS_CATEGORY) return { error: 'Light or stiff is just for spirits' }
+        if (!STRENGTHS.includes(strength)) return { error: 'Pour is regular or light' }
+        if (d.category !== SPIRITS_CATEGORY) return { error: 'A light pour is just for spirits' }
       }
       const key = d.id + '|' + (mixer || '') + '|' + (strength || '')
       merged.set(key, { drink_id: d.id, drink_name: d.name, mixer, strength, qty: (merged.get(key)?.qty || 0) + qty })
@@ -120,14 +120,13 @@ export function buildApp(store, { barPin }) {
   bar.post('/orders', async (req, res, next) => {
     try {
       const guest_name = str(req.body?.guest_name)
-      const placed_by = str(req.body?.placed_by)
       if (!guest_name) return bad(res, 400, 'Whose drink is it?')
-      if (!placed_by) return bad(res, 400, 'Missing bartender name')
       const f = resolveFulfilment(req.body)
       if (f.error) return bad(res, 400, f.error)
       const { items, error } = await resolveItems(req.body?.items, { requireAvailable: false })
       if (error) return bad(res, 400, error)
-      const order = await store.createOrder({ guest_name, placed_by, fulfilment: f.fulfilment, table_no: f.table_no, items })
+      // placed_by marks it as typed in at the bar rather than ordered from a phone.
+      const order = await store.createOrder({ guest_name, placed_by: 'Bar', fulfilment: f.fulfilment, table_no: f.table_no, items })
       res.status(201).json(order)
     } catch (e) { next(e) }
   })
@@ -136,34 +135,26 @@ export function buildApp(store, { barPin }) {
     try {
       const existing = await store.getOrder(req.params.id)
       if (!existing) return bad(res, 404, 'Order not found')
-      const by = str(req.body?.by)
+      // No bartender identities: the bar is one shared PIN, so the actions just move the status.
+      // start = someone's making it (Preparing), made = done (there is no separate "delivered"
+      // step: made it means it's at the bar or on its way), putback = back to New.
       const action = str(req.body?.action, 20)
       const patch = {}
       switch (action) {
-        case 'claim':
-          if (existing.claimed_by && existing.claimed_by !== by && existing.status !== 'new') {
-            return bad(res, 409, `${existing.claimed_by} already has this one`)
-          }
-          patch.claimed_by = by
+        case 'start':
           patch.status = 'making'
           break
-        case 'unclaim':
-          patch.claimed_by = null
+        case 'putback':
           patch.status = 'new'
           break
-        case 'ready':
-          patch.status = 'ready'
-          if (!existing.claimed_by) patch.claimed_by = by
-          break
-        case 'delivered':
+        case 'made':
           patch.status = 'delivered'
-          if (!existing.claimed_by) patch.claimed_by = by
           break
         case 'cancel':
           patch.status = 'cancelled'
           break
         case 'reopen':
-          patch.status = existing.claimed_by ? 'making' : 'new'
+          patch.status = 'making'
           break
         default:
           return bad(res, 400, 'Unknown action')

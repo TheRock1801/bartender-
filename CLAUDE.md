@@ -23,12 +23,13 @@ Personal side project for Rocky Judd, **not Harrows work**. A phone web app for 
 - **Order numbers (new):** `orders.order_no` is a Postgres `serial` (the memory store counts from 1); shown as `#14` on both screens. The bar fetches `?all=1` every poll so its Delivered filter works.
 - **Tabs: Spirits, Cocktails, Beer & Wine, Non-alcoholic** (`CATEGORIES`). Hot Drinks and the sugar logic are gone. Seed menu is in `lib/store.js` and `supabase_schema.sql`: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac / Espresso Martini, Aperol Spritz, Whiskey Sour / Beer, Red, White, Sparkling wine / Lemonade, Juice, Sparkling water. The cocktails are placeholders Rocky hasn't confirmed.
 - **Mixers** (`MIXERS`): Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Orange/Pineapple/Cranberry juice (shown under one "Juice" row with flavour chips, `isJuice()` in `src/cart.ts`), On the rocks, plus **Other**: the guest types up to 40 chars, stored in `order_items.mixer` as `Other: <text>` (`OTHER_MIXER_RE`, `isValidMixer()`); `itemLabel()` renders it as "Gin & lime and soda". Coke Zero replaces the old fat/skinny pref; `resolveMixer`/`MIXER_VARIANTS` are gone, bartenders use the same list.
-- **Light / stiff pour kept** (spirits only, server-validated, same as before) but now a "Pour: Regular / Light / Stiff" row at the bottom of the mixer page, not chips in the row. The mood board doesn't show it; Rocky hasn't said whether this couple wants it. Easy to hide by passing `strengths={[]}` to `MixerSheet`.
+- **Pour is Regular / Light only** (Rocky, 2026-10-22: "only make a light option instead of light + stiff"). `STRENGTHS = ['light']` in `lib/store.js`, spirits only, server-validated; a "Pour" row at the bottom of the mixer page. `stiff` is rejected. The `order_items.strength` column is unchanged (text), only the allowed value shrank.
 - **Mixer picking is a full-screen page** (`MixerSheet` in `src/DrinkRows.tsx`): back arrow, big glass, spirit name, "Choose your mixer", radio rows, then "Add to order" fixed at the bottom. Tapping "Choose" on a spirit opens it; non-spirits are Add then − n +.
 - **"Your Order" is a full-screen page** (`OrderSheet` in `src/GuestApp.tsx`): florals, script heading, lines with − n +, "How would you like your drink?" two cards, table number, name, "Place order — it's on us!". The bottom bar on the menu is one button, "View your order · n drinks".
-- **Bar queue restyled** (`Queue`/`OrderRow` in `src/BarApp.tsx`): filter tabs All orders / New / Preparing / Ready / Delivered with counts, rows of `#no + time | glass | name + drinks | Deliver Table 4 or Collect at bar | status pill` (sand New, terracotta Preparing, olive Ready, grey Delivered). Tap a row to expand the items and the actions. Claims work as before (`claim/unclaim/ready/delivered/cancel/reopen`); the pill shows "· you" or "· Name" for who has it. The mood board's "Preparing" dropdown became explicit buttons on purpose (no mis-taps).
-- **`BARTENDERS` in `src/BarApp.tsx` is `['Rocky', 'Bartender 2', 'Bartender 3', 'Bartender 4']`**: Rocky hasn't said who's pouring this time. Replace before the night.
-- localStorage keys are `rj_*` (device id, guest name, fulfilment, table, bar PIN, bar name).
+- **Bar queue restyled** (`Queue`/`OrderRow` in `src/BarApp.tsx`): filter tabs All orders / New / Preparing / Made with counts, rows of `#no + time | glass | name + drinks | Deliver Table 4 or Collect at bar | status pill` (sand New, terracotta Preparing, olive Made). Tap a row to expand the items and the actions. The mood board's "Preparing" dropdown became explicit buttons on purpose (no mis-taps).
+- **No bartender names, no claims (Rocky, 2026-10-22: "remove the bartender option").** The bar is PIN → queue, nothing else; `BARTENDERS`, the "who's pouring?" screen and `claimed_by` handling are gone. `PATCH /api/bar/orders/:id` takes only `{action}`: `start` (New → Preparing), `made` (→ done), `putback` (Preparing → New), `cancel`, `reopen` (→ Preparing). Verbal orders get `placed_by: 'Bar'`. The `orders.claimed_by` column still exists, always null.
+- **One finishing step, "Made it" (Rocky, 2026-10-22: "there shouldnt be a made it and then delivered it option, should be purely made it").** Status flow is `new → making → delivered`; the `ready` status is never set any more (kept in the DB check and `OPEN_STATUSES` for safety, and the UI renders it like `delivered` if an old row has it). `delivered` reads as "Made" on the bar and "Made, come grab it at the bar" / "Made, on its way to table N" for the guest; a made order stays under the guest's "Your drinks" for 5 minutes after `updated_at`, then drops to "Earlier".
+- localStorage keys are `rj_*` (device id, guest name, fulfilment, table, bar PIN).
 
 ## Data model (Supabase)
 
@@ -37,7 +38,6 @@ Personal side project for Rocky Judd, **not Harrows work**. A phone web app for 
 ## Product rules carried over (don't undo)
 
 - Deliberately minimal: no payments, no accounts, no email, no per-guest order cap.
-- Bartenders pick their name from a fixed list, never type it.
 - A spirit without a mixer is rejected server-side; a mixer on a non-spirit is rejected. Lines with the same drink + mixer + pour merge.
 - Verbal orders ignore `ordering_open` and availability so the bar can always record what it's making.
 - Tapping a drink name (Menu tab, or inside an expanded order) opens the recipe sheet: instructions, ordered-tonight tally, mark run out, remove (confirm step; past orders keep the name).
@@ -52,6 +52,6 @@ Tokens in `tailwind.config.js` keep the OLD colour names so shared classes work:
 ## Open items
 
 - Rocky to run `supabase_riley_jasmine_reset.sql` and confirm, then place a test order on the live site. Consider changing `BAR_PIN` on Vercel if the A&J crew still know the old one.
-- Real bartender names, real cocktail list, and whether to keep the light/stiff pour: all Rocky's calls, none confirmed.
+- Real cocktail list: the three seeded ones are placeholders Rocky hasn't confirmed.
 - Not visually verified by Claude (no headless browser here); Rocky checks on his phone. Watch for: the Non-alcoholic tab label width on narrow phones (tabs scroll horizontally), and the header crop's cream not quite matching the page on OLED screens.
 - Custom domain / QR code: same as the A&J app, nothing chosen.

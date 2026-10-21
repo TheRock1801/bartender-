@@ -35,7 +35,7 @@ test('menu is seeded with the mood-board spirits, four tabs, the mixer list and 
   assert.deepEqual(body.drinks.filter((d) => d.category === 'Spirits').map((d) => d.name), ['Whiskey', 'Bourbon', 'Gin', 'Vodka', 'Rum', 'Brandy', 'Cognac'])
   assert.deepEqual(body.mixers, ['Coke', 'Coke Zero', 'Lemonade', 'Dry Ginger Ale', 'Soda Water', 'Tonic Water', 'Ginger Beer', 'Orange juice', 'Pineapple juice', 'Cranberry juice', 'On the rocks'])
   assert.equal(body.other_mixer, 'Other')
-  assert.deepEqual(body.strengths, ['light', 'stiff'])
+  assert.deepEqual(body.strengths, ['light'])
   assert.deepEqual(body.fulfilments, ['collect', 'deliver'])
   assert.equal(body.settings.ordering_open, true)
 })
@@ -46,7 +46,7 @@ test('bartender routes need the PIN', async () => {
   assert.equal((await call('/api/bar/login', { method: 'POST', pin: PIN })).status, 200)
 })
 
-test('guest orders, bartender claims, readies, delivers; order numbers count up', async () => {
+test('guest orders, the bar starts it and marks it made; order numbers count up', async () => {
   const { drinks } = (await call('/api/menu')).body
   const spritz = drinks.find((d) => d.name === 'Aperol Spritz'), bourbon = drinks.find((d) => d.name === 'Bourbon')
   const placed = await guestOrder([{ drink_id: spritz.id, qty: 2 }, { drink_id: bourbon.id, qty: 1, mixer: 'Coke' }, { drink_id: spritz.id, qty: 1 }])
@@ -69,21 +69,24 @@ test('guest orders, bartender claims, readies, delivers; order numbers count up'
   assert.equal(queue.body.orders.length, 2)
 
   const id = placed.body.id
-  const claimed = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'claim', by: 'Rocky' } })
-  assert.equal(claimed.body.status, 'making')
-  assert.equal(claimed.body.claimed_by, 'Rocky')
+  const started = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'start' } })
+  assert.equal(started.body.status, 'making')
 
-  // someone else cannot steal it while in progress
-  const steal = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'claim', by: 'Jess' } })
-  assert.equal(steal.status, 409)
+  const back = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'putback' } })
+  assert.equal(back.body.status, 'new')
+  await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'start' } })
 
-  const ready = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'ready', by: 'Rocky' } })
-  assert.equal(ready.body.status, 'ready')
-  const done = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'delivered', by: 'Jess' } })
+  // "made it" is the end of the line: no separate ready / delivered steps
+  assert.equal((await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'ready' } })).status, 400)
+  assert.equal((await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'delivered' } })).status, 400)
+  const done = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'made' } })
   assert.equal(done.body.status, 'delivered')
-  assert.equal(done.body.claimed_by, 'Rocky')
 
-  // delivered orders leave the open queue but are still there with ?all=1, and the guest still sees them
+  const reopened = await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'reopen' } })
+  assert.equal(reopened.body.status, 'making')
+  await call(`/api/bar/orders/${id}`, { method: 'PATCH', pin: PIN, body: { action: 'made' } })
+
+  // made orders leave the open queue but are still there with ?all=1, and the guest still sees them
   assert.equal((await call('/api/bar/orders', { pin: PIN })).body.orders.length, 1)
   assert.equal((await call('/api/bar/orders?all=1', { pin: PIN })).body.orders.length, 2)
   assert.equal((await call('/api/orders/mine?device_id=dev-1')).body.orders.find((o) => o.id === id).status, 'delivered')
@@ -107,10 +110,10 @@ test('deliver to table needs a table number; collect ignores one', async () => {
   assert.equal(collect.body.table_no, null)
 
   // a bartender's verbal order carries the same details
-  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', fulfilment: 'deliver', table_no: '12', items: [{ drink_id: beer.id }] } })
+  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', fulfilment: 'deliver', table_no: '12', items: [{ drink_id: beer.id }] } })
   assert.equal(verbal.status, 201)
   assert.equal(verbal.body.table_no, '12')
-  assert.equal(verbal.body.placed_by, 'Rocky')
+  assert.equal(verbal.body.placed_by, 'Bar')
 })
 
 test('guest order is rejected without a name or with an empty cart', async () => {
@@ -130,7 +133,7 @@ test('run-out drinks cannot be ordered by guests but can be recorded by a barten
   assert.equal(guest.status, 400)
   assert.match(guest.body.error, /run out/)
 
-  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', placed_by: 'Rocky', items: [{ drink_id: wine.id }] } })
+  const verbal = await call('/api/bar/orders', { method: 'POST', pin: PIN, body: { guest_name: 'Al', items: [{ drink_id: wine.id }] } })
   assert.equal(verbal.status, 201)
 
   await call(`/api/bar/drinks/${wine.id}`, { method: 'PATCH', pin: PIN, body: { available: true } })
@@ -175,7 +178,7 @@ test('drink instructions save on add and edit, tally counts non-cancelled orders
   const o1 = await call('/api/orders', { method: 'POST', body: { guest_name: 'Tal', device_id: 'dev-t', items: [{ drink_id: added.body.id, qty: 2 }] } })
   const o2 = await call('/api/orders', { method: 'POST', body: { guest_name: 'Tal', device_id: 'dev-t', items: [{ drink_id: added.body.id, qty: 5 }] } })
   assert.equal(o1.status, 201)
-  await call(`/api/bar/orders/${o2.body.id}`, { method: 'PATCH', pin: PIN, body: { action: 'cancel', by: 'Rocky' } })
+  await call(`/api/bar/orders/${o2.body.id}`, { method: 'PATCH', pin: PIN, body: { action: 'cancel' } })
   const queue = await call('/api/bar/orders', { pin: PIN })
   assert.equal(queue.body.tally[added.body.id], 2)
 
@@ -224,26 +227,27 @@ test('spirits need a mixer from the list or "Other: …", other drinks refuse on
   assert.ok(queue.body.tally[bourbon.id] >= 6)
 })
 
-test('light/stiff is kept per line, validated, and only allowed on spirits', async () => {
+test('a light pour is kept per line, is the only option beyond regular, and only on spirits', async () => {
   const { drinks } = (await call('/api/menu')).body
   const gin = drinks.find((d) => d.name === 'Gin')
   const spritz = drinks.find((d) => d.name === 'Aperol Spritz')
   const beer = drinks.find((d) => d.name === 'Beer')
 
+  assert.equal((await guestOrder([{ drink_id: gin.id, mixer: 'Tonic Water', strength: 'stiff' }])).status, 400)
   assert.equal((await guestOrder([{ drink_id: gin.id, mixer: 'Tonic Water', strength: 'double' }])).status, 400)
-  assert.equal((await guestOrder([{ drink_id: beer.id, strength: 'stiff' }])).status, 400)
-  assert.equal((await guestOrder([{ drink_id: spritz.id, strength: 'stiff' }])).status, 400)
+  assert.equal((await guestOrder([{ drink_id: beer.id, strength: 'light' }])).status, 400)
+  assert.equal((await guestOrder([{ drink_id: spritz.id, strength: 'light' }])).status, 400)
 
   const ok = await guestOrder([
-    { drink_id: gin.id, mixer: 'Tonic Water', strength: 'stiff' },
+    { drink_id: gin.id, mixer: 'Tonic Water', strength: 'light' },
     { drink_id: gin.id, mixer: 'Tonic Water' },
-    { drink_id: gin.id, mixer: 'Tonic Water', strength: 'STIFF' },
+    { drink_id: gin.id, mixer: 'Tonic Water', strength: 'LIGHT' },
     { drink_id: gin.id, mixer: 'On the rocks', strength: 'light', qty: 2 },
     { drink_id: spritz.id },
   ])
   assert.equal(ok.status, 201)
   assert.deepEqual(ok.body.items.map((i) => [i.drink_name, i.mixer, i.strength, i.qty]), [
-    ['Gin', 'Tonic Water', 'stiff', 2],
+    ['Gin', 'Tonic Water', 'light', 2],
     ['Gin', 'Tonic Water', null, 1],
     ['Gin', 'On the rocks', 'light', 2],
     ['Aperol Spritz', null, null, 1],

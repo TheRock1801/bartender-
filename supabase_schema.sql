@@ -36,7 +36,7 @@ create table if not exists order_items (
   drink_id uuid references drinks(id) on delete set null,
   drink_name text not null,
   mixer text,                               -- spirits only: Coke, Tonic Water, "Other: lime & soda"…
-  strength text check (strength in ('light','stiff')),  -- spirits only; null = regular pour
+  strength text check (strength in ('light')),  -- spirits only; null = regular pour
   qty integer not null default 1 check (qty > 0)
 );
 

@@ -26,7 +26,7 @@ export const cartCount = (cart: Cart) => Object.values(cart).reduce((n, l) => n 
 export const drinkQty = (cart: Cart, drink_id: string) =>
   Object.values(cart).filter((l) => l.drink_id === drink_id).reduce((n, l) => n + l.qty, 0)
 
-// "Bourbon & Coke", "Whiskey on the rocks", "Gin & Other: lime & soda, stiff", or just the name.
+// "Bourbon & Coke", "Whiskey on the rocks", "Gin & lime & soda, light", or just the name.
 export function itemLabel(name: string, mixer: string | null | undefined, strength?: Strength | null): string {
   let s = name
   if (mixer === 'On the rocks') s = `${name} on the rocks`

@@ -6,27 +6,13 @@ import { CartSummary, DrinkRows, MixerSheet } from './DrinkRows'
 import { usePoll } from './usePoll'
 
 const PIN_KEY = 'rj_bar_pin'
-const NAME_KEY = 'rj_bar_name'
 
-// Whoever is behind the bar. Picked from a list rather than typed so names match exactly
-// across phones (claims and "X is making it" labels depend on it). Edit for the night.
-export const BARTENDERS = ['Rocky', 'Bartender 2', 'Bartender 3', 'Bartender 4'] as const
-
+// One shared PIN, no bartender names: every phone behind the bar sees the same queue
+// and anyone can move an order along.
 export default function BarApp() {
   const [pin, setPin] = useState(() => stored(PIN_KEY))
-  const [name, setName] = useState(() => {
-    const n = stored(NAME_KEY)
-    return (BARTENDERS as readonly string[]).includes(n) ? n : ''
-  })
   if (!pin) return <PinScreen onOk={(p) => { store(PIN_KEY, p); setPin(p) }} />
-  if (!name) return <NameScreen onOk={(n) => { store(NAME_KEY, n); setName(n) }} />
-  return (
-    <Bar
-      pin={pin}
-      me={name}
-      onLogout={() => { store(PIN_KEY, ''); store(NAME_KEY, ''); setPin(''); setName('') }}
-    />
-  )
+  return <Bar pin={pin} onLogout={() => { store(PIN_KEY, ''); setPin('') }} />
 }
 
 function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
@@ -59,26 +45,9 @@ function PinScreen({ onOk }: { onOk: (pin: string) => void }) {
   )
 }
 
-function NameScreen({ onOk }: { onOk: (name: string) => void }) {
-  return (
-    <main className="min-h-dvh flex items-center justify-center px-6">
-      <div className="card w-full max-w-xs flex flex-col gap-3 p-6">
-        <CoupleNames size="sm" />
-        <h1 className="display text-2xl text-center mt-2">Who's pouring?</h1>
-        <div className="grid grid-cols-2 gap-2">
-          {BARTENDERS.map((n) => (
-            <button key={n} className="btn-soft text-base py-4" onClick={() => onOk(n)}>{n}</button>
-          ))}
-        </div>
-        <p className="text-xs text-stone text-center">Your phone remembers you. Tap "switch" at the top to change.</p>
-      </div>
-    </main>
-  )
-}
-
 type Tab = 'queue' | 'new' | 'menu'
 
-function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => void }) {
+function Bar({ pin, onLogout }: { pin: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('queue')
   // The whole night's orders, so the Delivered filter works; one evening's worth is small.
   const queue = usePoll(() => api.bar.orders(pin, true), 4000, [pin])
@@ -107,7 +76,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
 
   const act = async (o: Order, action: string) => {
     try {
-      const updated = await api.bar.act(pin, o.id, action, me)
+      const updated = await api.bar.act(pin, o.id, action)
       queue.setData((d) => d && { ...d, orders: d.orders.map((x) => (x.id === updated.id ? updated : x)) })
     } catch (e) {
       flash(e instanceof Error ? e.message : 'Did not save')
@@ -132,7 +101,7 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
           <div>
             <h1 className="script text-[1.9rem]">Riley &amp; Jasmine</h1>
             <p className="text-xs text-stone">
-              The Bar · {me} · <button className="underline underline-offset-4" onClick={onLogout}>switch</button>
+              The Bar · <button className="underline underline-offset-4" onClick={onLogout}>log out</button>
             </p>
           </div>
         </div>
@@ -149,9 +118,9 @@ function Bar({ pin, me, onLogout }: { pin: string; me: string; onLogout: () => v
       {queue.error && <p className="mx-5 mt-3 rounded-xl bg-amber text-ivory px-3 py-2 text-sm">Connection trouble: {queue.error}. Showing the last known queue.</p>}
 
       <div className="px-5 mt-4">
-        {tab === 'queue' && <Queue orders={orders} me={me} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
-        {tab === 'new' && <NewOrder pin={pin} me={me} drinks={drinks} categories={categories} mixers={mixers} otherMixer={otherMixer} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
-        {tab === 'menu' && <MenuManager pin={pin} me={me} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
+        {tab === 'queue' && <Queue orders={orders} now={queue.data?.now} act={act} loading={!queue.data} onShowDrink={setOpenDrinkId} />}
+        {tab === 'new' && <NewOrder pin={pin} drinks={drinks} categories={categories} mixers={mixers} otherMixer={otherMixer} spiritsCategory={spiritsCategory} strengths={strengths} onPlaced={(o) => { queue.setData((d) => d && { ...d, orders: [...d.orders, o] }); setTab('queue'); flash(`Added ${o.guest_name}'s order`) }} onError={flash} />}
+        {tab === 'menu' && <MenuManager pin={pin} drinks={drinks} categories={categories} tally={tally} onChange={() => menu.refresh()} onError={flash} onShowDrink={setOpenDrinkId} />}
       </div>
 
       <nav className="fixed bottom-0 inset-x-0 bg-ivory/95 backdrop-blur border-t border-taupe/70">
@@ -197,16 +166,16 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 // ---- Orders ----
 
-type Filter = 'all' | 'new' | 'making' | 'ready' | 'delivered'
+type Filter = 'all' | 'new' | 'making' | 'delivered'
 
-function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]; me: string; now?: string; act: (o: Order, a: string) => void; loading: boolean; onShowDrink: (id: string) => void }) {
+function Queue({ orders, now, act, loading, onShowDrink }: { orders: Order[]; now?: string; act: (o: Order, a: string) => void; loading: boolean; onShowDrink: (id: string) => void }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [expanded, setExpanded] = useState<string | null>(null)
   const nowMs = now ? new Date(now).getTime() : Date.now()
   const open = orders.filter((o) => ['new', 'making', 'ready'].includes(o.status))
   const by = (s: Order['status']) => orders.filter((o) => o.status === s)
-  const counts: Record<Filter, number> = { all: open.length, new: by('new').length, making: by('making').length, ready: by('ready').length, delivered: by('delivered').length }
-  const labels: Record<Filter, string> = { all: 'All orders', new: 'New', making: 'Preparing', ready: 'Ready', delivered: 'Delivered' }
+  const counts: Record<Filter, number> = { all: open.length, new: by('new').length, making: by('making').length, delivered: by('delivered').length }
+  const labels: Record<Filter, string> = { all: 'All orders', new: 'New', making: 'Preparing', delivered: 'Made' }
   const list = (filter === 'all' ? open : by(filter)).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
 
   if (loading) return <p className="text-stone">Loading…</p>
@@ -225,43 +194,38 @@ function Queue({ orders, me, now, act, loading, onShowDrink }: { orders: Order[]
 
       <div className="flex flex-col mt-1">
         {list.map((o) => (
-          <OrderRow key={o.id} order={o} me={me} nowMs={nowMs} expanded={expanded === o.id} onToggle={() => setExpanded(expanded === o.id ? null : o.id)} act={act} onShowDrink={onShowDrink} />
+          <OrderRow key={o.id} order={o} nowMs={nowMs} expanded={expanded === o.id} onToggle={() => setExpanded(expanded === o.id ? null : o.id)} act={act} onShowDrink={onShowDrink} />
         ))}
       </div>
     </div>
   )
 }
 
-function StatusPill({ order, me }: { order: Order; me: string }) {
+function StatusPill({ order }: { order: Order }) {
   const cls: Record<Order['status'], string> = {
     new: 'bg-sand text-cocoa',
     making: 'bg-amber text-ivory',
     ready: 'bg-sage text-ivory',
-    delivered: 'bg-mist text-stone',
+    delivered: 'bg-sage text-ivory',
     cancelled: 'bg-mist text-stone line-through',
   }
-  const text: Record<Order['status'], string> = { new: 'New', making: 'Preparing', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled' }
+  const text: Record<Order['status'], string> = { new: 'New', making: 'Preparing', ready: 'Made', delivered: 'Made', cancelled: 'Cancelled' }
   return (
     <span className={`pill !px-3 !py-2 !rounded-lg justify-center min-w-[6.2rem] ${cls[order.status]}`}>
       {text[order.status]}
-      {order.claimed_by && order.status !== 'delivered' && order.status !== 'cancelled' && (
-        <span className="ml-1 opacity-80">· {order.claimed_by === me ? 'you' : order.claimed_by}</span>
-      )}
       <svg className="ml-1.5 opacity-70" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
     </span>
   )
 }
 
-function OrderRow({ order, me, nowMs, expanded, onToggle, act, onShowDrink }: {
-  order: Order; me: string; nowMs: number; expanded: boolean; onToggle: () => void; act: (o: Order, a: string) => void; onShowDrink: (id: string) => void
+function OrderRow({ order, nowMs, expanded, onToggle, act, onShowDrink }: {
+  order: Order; nowMs: number; expanded: boolean; onToggle: () => void; act: (o: Order, a: string) => void; onShowDrink: (id: string) => void
 }) {
   const mins = minutesAgo(order.created_at, nowMs)
   const late = mins >= 10 && ['new', 'making'].includes(order.status)
   const first = order.items[0]
-  const mineToMake = order.claimed_by === me
-  const othersOnIt = order.claimed_by && !mineToMake && ['making', 'ready'].includes(order.status)
   return (
-    <div className={`row ${othersOnIt ? 'opacity-75' : ''}`}>
+    <div className="row">
       <button className="w-full flex items-center gap-3 text-left" onClick={onToggle} aria-expanded={expanded}>
         <div className="w-14 shrink-0">
           <div className="text-base text-espresso">#{order.order_no}</div>
@@ -280,7 +244,7 @@ function OrderRow({ order, me, nowMs, expanded, onToggle, act, onShowDrink }: {
             {order.fulfilment === 'deliver' ? <>Deliver<br />Table {order.table_no}</> : <>Collect<br />at bar</>}
           </div>
         </div>
-        <StatusPill order={order} me={me} />
+        <StatusPill order={order} />
       </button>
 
       {expanded && (
@@ -292,19 +256,18 @@ function OrderRow({ order, me, nowMs, expanded, onToggle, act, onShowDrink }: {
                 {i.drink_id ? (
                   <button className="underline decoration-dotted underline-offset-4 text-left text-espresso" onClick={() => onShowDrink(i.drink_id!)}>{itemLabel(i.drink_name, i.mixer, i.strength)}</button>
                 ) : <span>{itemLabel(i.drink_name, i.mixer, i.strength)}</span>}
-                {i.strength && <span className={`pill ml-1 capitalize ${i.strength === 'stiff' ? 'bg-amber text-ivory' : 'bg-sage/20 text-sage'}`}>{i.strength}</span>}
+                {i.strength && <span className="pill ml-1 capitalize bg-sage/20 text-sage">{i.strength} pour</span>}
               </li>
             ))}
             <li className="text-xs text-stone pt-2">
-              {order.placed_by ? `Taken by ${order.placed_by}` : 'From the app'} · {mins} min ago
-              {order.claimed_by && ` · ${order.claimed_by} ${order.status === 'ready' ? 'has it ready' : order.status === 'delivered' ? 'delivered it' : 'is making it'}`}
+              {order.placed_by ? 'Typed in at the bar' : 'From the app'} · {mins} min ago
             </li>
           </ul>
           <div className="mt-3 flex gap-2 items-center flex-wrap">
-            {order.status === 'new' && <button className="btn-primary flex-1" onClick={() => act(order, 'claim')}>I've got it</button>}
-            {order.status === 'making' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'ready')}>Ready</button>}
-            {order.status === 'ready' && <button className="btn-dark flex-1" onClick={() => act(order, 'delivered')}>{order.fulfilment === 'deliver' ? 'Delivered' : 'Collected'}</button>}
-            {order.status === 'making' && mineToMake && <button className="btn-ghost" onClick={() => act(order, 'unclaim')}>Put back</button>}
+            {order.status === 'new' && <button className="btn-primary flex-1" onClick={() => act(order, 'start')}>Making it</button>}
+            {order.status === 'making' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'made')}>Made it</button>}
+            {order.status === 'ready' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'made')}>Made it</button>}
+            {order.status === 'making' && <button className="btn-ghost" onClick={() => act(order, 'putback')}>Put back</button>}
             {['new', 'making', 'ready'].includes(order.status) && <button className="btn-ghost" onClick={() => act(order, 'cancel')}>Cancel</button>}
             {['delivered', 'cancelled'].includes(order.status) && <button className="btn-soft flex-1" onClick={() => act(order, 'reopen')}>Reopen</button>}
           </div>
@@ -316,8 +279,8 @@ function OrderRow({ order, me, nowMs, expanded, onToggle, act, onShowDrink }: {
 
 // ---- New (verbal) order ----
 
-function NewOrder({ pin, me, drinks, categories, mixers, otherMixer, spiritsCategory, strengths, onPlaced, onError }: {
-  pin: string; me: string; drinks: Drink[]; categories: string[]; mixers: string[]; otherMixer: string; spiritsCategory: string; strengths: Strength[]
+function NewOrder({ pin, drinks, categories, mixers, otherMixer, spiritsCategory, strengths, onPlaced, onError }: {
+  pin: string; drinks: Drink[]; categories: string[]; mixers: string[]; otherMixer: string; spiritsCategory: string; strengths: Strength[]
   onPlaced: (o: Order) => void; onError: (m: string) => void
 }) {
   const [guest, setGuest] = useState('')
@@ -338,7 +301,7 @@ function NewOrder({ pin, me, drinks, categories, mixers, otherMixer, spiritsCate
   const submit = async () => {
     setBusy(true)
     try {
-      onPlaced(await api.bar.placeOrder(pin, { guest_name: guest.trim(), fulfilment, table_no: table.trim() }, me, lines))
+      onPlaced(await api.bar.placeOrder(pin, { guest_name: guest.trim(), fulfilment, table_no: table.trim() }, lines))
       setGuest(''); setTable('')
       setCart({})
     } catch (e) {
@@ -405,7 +368,7 @@ function NewOrder({ pin, me, drinks, categories, mixers, otherMixer, spiritsCate
 
 // ---- Menu management ----
 
-function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, onShowDrink }: { pin: string; me: string; drinks: Drink[]; categories: string[]; tally: Tally; onChange: () => void; onError: (m: string) => void; onShowDrink: (id: string) => void }) {
+function MenuManager({ pin, drinks, categories, tally, onChange, onError, onShowDrink }: { pin: string; drinks: Drink[]; categories: string[]; tally: Tally; onChange: () => void; onError: (m: string) => void; onShowDrink: (id: string) => void }) {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [instructions, setInstructions] = useState('')
@@ -416,7 +379,7 @@ function MenuManager({ pin, me, drinks, categories, tally, onChange, onError, on
   const add = async () => {
     setBusy(true)
     try {
-      await api.bar.addDrink(pin, { name: name.trim(), description: desc.trim(), category: cat, added_by: me, instructions: instructions.trim() })
+      await api.bar.addDrink(pin, { name: name.trim(), description: desc.trim(), category: cat, added_by: 'Bar', instructions: instructions.trim() })
       setName(''); setDesc(''); setInstructions('')
       onChange()
     } catch (e) { onError(e instanceof Error ? e.message : 'Did not save') } finally { setBusy(false) }
