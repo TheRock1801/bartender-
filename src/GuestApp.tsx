@@ -114,8 +114,7 @@ export default function GuestApp() {
         </section>
       )}
 
-      <p className="mt-12 text-center text-xs text-stone">Nothing to pay. Just order and we'll sort the rest.</p>
-      <a href="/bar" className="block mt-6 text-center text-xs text-stone/70 underline underline-offset-4">Bar staff</a>
+      <a href="/bar" className="block mt-12 text-center text-xs text-stone/70 underline underline-offset-4">Bar staff</a>
 
       {count > 0 && open && !ordering && !choosing && (
         <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">

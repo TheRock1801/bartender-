@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Drink, Strength } from './api'
 import { BackArrow, Check, Glass } from './art'
 import { cartKey, drinkQty, isJuice, itemLabel, type Cart } from './cart'
@@ -92,16 +92,24 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
           ))}
           {juices.length > 0 && (
             <>
-              <MixerRow title="Juice" sub={juices.map((j) => j.replace(/\s*juice$/i, '')).join(', ')} selected={mixer === 'Juice'} onPick={() => setMixer('Juice')} />
-              {mixer === 'Juice' && (
-                <div className="flex flex-wrap gap-2 px-1 -mt-0.5 fade-up">
-                  {juices.map((j) => (
-                    <button key={j} onClick={() => setJuice(j)} className={`rounded-lg border px-3 py-2 text-sm ${juice === j ? 'bg-espresso text-ivory border-espresso' : 'border-cocoa/30 text-cocoa'}`} aria-pressed={juice === j}>
-                      {j.replace(/\s*juice$/i, '')}
-                    </button>
-                  ))}
+              <MixerRow title="Juice" sub={mixer === 'Juice' && juice ? juice.replace(/\s*juice$/i, '') : 'Pick a flavour'} selected={mixer === 'Juice' && !!juice} onPick={() => { setMixer('Juice'); if (!juice) setJuice(juices[0]) }}>
+                <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Juice flavour">
+                  {juices.map((j) => {
+                    const on = mixer === 'Juice' && juice === j
+                    return (
+                      <button
+                        key={j}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setMixer('Juice'); setJuice(j) }}
+                        className={`rounded-lg border px-3.5 py-2 text-sm ${on ? 'bg-amber text-ivory border-amber' : 'border-cocoa/30 text-cocoa'}`}
+                        aria-pressed={on}
+                      >
+                        {j.replace(/\s*juice$/i, '')}
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
+              </MixerRow>
             </>
           )}
           <MixerRow title={otherMixer} sub="Let us know" selected={mixer === otherMixer} onPick={() => setMixer(otherMixer)} />
@@ -145,15 +153,25 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
 }
 
 // One radio row on the mixer list.
-function MixerRow({ title, sub, selected, onPick }: { title: string; sub?: string; selected: boolean; onPick: () => void }) {
+function MixerRow({ title, sub, selected, onPick, children }: { title: string; sub?: string; selected: boolean; onPick: () => void; children?: ReactNode }) {
   return (
-    <button onClick={onPick} className="card w-full flex items-center gap-3 text-left py-4" role="radio" aria-checked={selected}>
-      <div className="flex-1 min-w-0">
-        <div className="text-base text-espresso">{title}</div>
-        {sub && <div className="text-sm text-stone">{sub}</div>}
+    <div
+      onClick={onPick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick() } }}
+      className="card w-full text-left py-4 cursor-pointer select-none"
+      role="radio"
+      aria-checked={selected}
+      tabIndex={0}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-base text-espresso">{title}</div>
+          {sub && <div className="text-sm text-stone">{sub}</div>}
+        </div>
+        <span className={`ring-radio ${selected ? 'bg-amber border-amber text-ivory' : ''}`}>{selected && <Check />}</span>
       </div>
-      <span className={`ring-radio ${selected ? 'bg-amber border-amber text-ivory' : ''}`}>{selected && <Check />}</span>
-    </button>
+      {children}
+    </div>
   )
 }
 

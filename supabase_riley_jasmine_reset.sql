@@ -40,8 +40,10 @@ insert into drinks (name, description, category, sort) values
   ('White wine', '', 'Beer & Wine', 32),
   ('Sparkling wine', '', 'Beer & Wine', 33),
   ('Lemonade', '', 'Non-alcoholic', 40),
-  ('Juice', 'Orange, pineapple or cranberry', 'Non-alcoholic', 41),
-  ('Sparkling water', '', 'Non-alcoholic', 42);
+  ('Orange juice', '', 'Non-alcoholic', 41),
+  ('Pineapple juice', '', 'Non-alcoholic', 42),
+  ('Cranberry juice', '', 'Non-alcoholic', 43),
+  ('Sparkling water', '', 'Non-alcoholic', 44);
 
 insert into settings (key, value) values
   ('ordering_open', 'true'::jsonb),
