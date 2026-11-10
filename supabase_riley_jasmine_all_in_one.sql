@@ -89,9 +89,13 @@ do $$ begin
   end if;
 end $$;
 
--- 4. Make the drinks table match the app's menu exactly
-create temp table new_menu (name text, description text, category text, sort integer);
-insert into new_menu values
+-- 4. Make the drinks table match the app's menu exactly.
+-- (The menu is repeated in each statement on purpose: the Supabase SQL editor does not keep a
+-- temp table alive between statements, which is what broke the first version of this file.)
+
+-- Drinks that are not on the list go (old A&J menu, Espresso Martini, Whiskey Sour, every juice).
+-- Unlink them from any surviving order lines first; drink_name on the line keeps the history readable.
+with new_menu (name, description, category, sort) as (values
   ('Whiskey', '', 'Spirits', 10),
   ('Bourbon', '', 'Spirits', 11),
   ('Gin', '', 'Spirits', 12),
@@ -108,28 +112,82 @@ insert into new_menu values
   ('White wine', '', 'Beer & Wine', 32),
   ('Sparkling wine', '', 'Beer & Wine', 33),
   ('Lemonade', '', 'Non-alcoholic', 40),
-  ('Sparkling water', '', 'Non-alcoholic', 41);
-
--- Drinks that are not on the list go (old A&J menu, Espresso Martini, Whiskey Sour, every juice).
--- Unlink them from any surviving order lines first; drink_name on the line keeps the history readable.
+  ('Sparkling water', '', 'Non-alcoholic', 41)
+)
 update order_items set drink_id = null
   where drink_id in (
     select d.id from drinks d
     where not exists (select 1 from new_menu m where m.name = d.name and m.category = d.category)
   );
+
+with new_menu (name, description, category, sort) as (values
+  ('Whiskey', '', 'Spirits', 10),
+  ('Bourbon', '', 'Spirits', 11),
+  ('Gin', '', 'Spirits', 12),
+  ('Vodka', '', 'Spirits', 13),
+  ('Rum', '', 'Spirits', 14),
+  ('Brandy', '', 'Spirits', 15),
+  ('Cognac', '', 'Spirits', 16),
+  ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
+  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
+  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
+  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Beer', '', 'Beer & Wine', 30),
+  ('Red wine', '', 'Beer & Wine', 31),
+  ('White wine', '', 'Beer & Wine', 32),
+  ('Sparkling wine', '', 'Beer & Wine', 33),
+  ('Lemonade', '', 'Non-alcoholic', 40),
+  ('Sparkling water', '', 'Non-alcoholic', 41)
+)
 delete from drinks d
   where not exists (select 1 from new_menu m where m.name = d.name and m.category = d.category);
 
 -- Drinks already on the list: refresh description/order and put them back on the menu.
+with new_menu (name, description, category, sort) as (values
+  ('Whiskey', '', 'Spirits', 10),
+  ('Bourbon', '', 'Spirits', 11),
+  ('Gin', '', 'Spirits', 12),
+  ('Vodka', '', 'Spirits', 13),
+  ('Rum', '', 'Spirits', 14),
+  ('Brandy', '', 'Spirits', 15),
+  ('Cognac', '', 'Spirits', 16),
+  ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
+  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
+  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
+  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Beer', '', 'Beer & Wine', 30),
+  ('Red wine', '', 'Beer & Wine', 31),
+  ('White wine', '', 'Beer & Wine', 32),
+  ('Sparkling wine', '', 'Beer & Wine', 33),
+  ('Lemonade', '', 'Non-alcoholic', 40),
+  ('Sparkling water', '', 'Non-alcoholic', 41)
+)
 update drinks d set description = m.description, sort = m.sort, available = true
   from new_menu m where m.name = d.name and m.category = d.category;
 
 -- Drinks on the list but missing: add them.
+with new_menu (name, description, category, sort) as (values
+  ('Whiskey', '', 'Spirits', 10),
+  ('Bourbon', '', 'Spirits', 11),
+  ('Gin', '', 'Spirits', 12),
+  ('Vodka', '', 'Spirits', 13),
+  ('Rum', '', 'Spirits', 14),
+  ('Brandy', '', 'Spirits', 15),
+  ('Cognac', '', 'Spirits', 16),
+  ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
+  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
+  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
+  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Beer', '', 'Beer & Wine', 30),
+  ('Red wine', '', 'Beer & Wine', 31),
+  ('White wine', '', 'Beer & Wine', 32),
+  ('Sparkling wine', '', 'Beer & Wine', 33),
+  ('Lemonade', '', 'Non-alcoholic', 40),
+  ('Sparkling water', '', 'Non-alcoholic', 41)
+)
 insert into drinks (name, description, category, sort)
   select m.name, m.description, m.category, m.sort from new_menu m
   where not exists (select 1 from drinks d where d.name = m.name and d.category = m.category);
-
-drop table new_menu;
 
 -- 5. Ordering open, last orders off
 insert into settings (key, value) values
