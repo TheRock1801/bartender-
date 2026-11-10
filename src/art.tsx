@@ -266,6 +266,24 @@ const ICONS: Record<string, (p: IconProps) => ReactNode> = {
       </WineGlass>
     </Svg>
   ),
+  margarita: (p) => (
+    <Svg {...p}>
+      <path d="M16 19 L25 29 Q32 32 39 29 L48 19 Z" fill={LIME} stroke="none" />
+      <path d="M13 16 L24 30 Q32 34 40 30 L51 16 Z" />
+      <path d="M32 34 V54" /><path d="M22 57 Q32 53 42 57" />
+      {[16, 20, 24, 28, 32, 36, 40, 44, 48].map((x) => <circle key={x} cx={x} cy={15.4} r="1.1" fill={FOAM} strokeWidth="0.7" />)}
+      <CitrusWheel cx={47} cy={17} r={5} color={LIME} segments="#6F7A3F" />
+    </Svg>
+  ),
+  'old fashioned': (p) => (
+    <Svg {...p}>
+      <Tumbler liquid={AMBER_DARK} level={28}>
+        <rect x="23" y="31" width="15" height="15" rx="2.5" transform="rotate(-8 30.5 38.5)" fill={ICE} fillOpacity="0.85" strokeWidth="1.1" />
+        <path d="M43 12 Q50 20 44 28 Q39 34 45 40" fill="none" stroke={ORANGE} strokeWidth="2.4" strokeLinecap="round" />
+        <Cherry cx={26} cy={25} />
+      </Tumbler>
+    </Svg>
+  ),
   sour: (p) => (
     <Svg {...p}>
       <Coupe liquid={LEMON}>
@@ -373,6 +391,8 @@ const ICONS: Record<string, (p: IconProps) => ReactNode> = {
 // First matching rule wins, so the specific names sit above the general ones.
 const RULES: [RegExp, keyof typeof ICONS][] = [
   [/espresso|martini/, 'espresso martini'],
+  [/old fashioned/, 'old fashioned'],
+  [/margarita/, 'margarita'],
   [/sour/, 'sour'],
   [/spritz|aperol/, 'spritz'],
   [/sparkling wine|prosecco|champagne|bubbles|bubbly/, 'sparkling wine'],
@@ -474,7 +494,7 @@ export function CoupleNames({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
   return (
     <div className="text-center">
       <h1 className={`script ${size === 'lg' ? 'text-[3.4rem]' : 'text-[2.1rem]'}`}>Riley &amp; Jasmine</h1>
-      <p className={`spaced text-stone ${size === 'lg' ? 'text-sm mt-2' : 'text-[0.65rem] mt-0.5'}`}>03 . 11 . 2026</p>
+      <p className={`spaced text-stone ${size === 'lg' ? 'text-sm mt-2' : 'text-[0.65rem] mt-0.5'}`}>10 . 11 . 2026</p>
     </div>
   )
 }

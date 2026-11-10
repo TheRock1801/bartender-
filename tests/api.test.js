@@ -33,7 +33,7 @@ test('menu is seeded with the mood-board spirits, four tabs, the mixer list and 
   assert.equal(status, 200)
   assert.deepEqual(body.categories, ['Spirits', 'Cocktails', 'Beer & Wine', 'Non-alcoholic'])
   assert.deepEqual(body.drinks.filter((d) => d.category === 'Spirits').map((d) => d.name), ['Whiskey', 'Bourbon', 'Gin', 'Vodka', 'Rum', 'Brandy', 'Cognac'])
-  assert.deepEqual(body.mixers, ['Coke', 'Coke Zero', 'Lemonade', 'Dry Ginger Ale', 'Soda Water', 'Tonic Water', 'Ginger Beer', 'Orange juice', 'Pineapple juice', 'Cranberry juice', 'On the rocks'])
+  assert.deepEqual(body.mixers, ['Coke', 'Coke Zero', 'Lemonade', 'Dry Ginger Ale', 'Soda Water', 'Tonic Water', 'Ginger Beer', 'On the rocks'])
   assert.equal(body.other_mixer, 'Other')
   assert.deepEqual(body.strengths, ['light'])
   assert.deepEqual(body.fulfilments, ['collect', 'deliver'])
@@ -201,6 +201,7 @@ test('spirits need a mixer from the list or "Other: …", other drinks refuse on
 
   assert.equal((await guestOrder([{ drink_id: bourbon.id, qty: 1 }])).status, 400)
   assert.equal((await guestOrder([{ drink_id: bourbon.id, qty: 1, mixer: 'Milk' }])).status, 400)
+  assert.equal((await guestOrder([{ drink_id: bourbon.id, qty: 1, mixer: 'Orange juice' }])).status, 400)
   assert.equal((await guestOrder([{ drink_id: bourbon.id, qty: 1, mixer: 'Other' }])).status, 400)
   assert.equal((await guestOrder([{ drink_id: bourbon.id, qty: 1, mixer: 'Other: ' }])).status, 400)
   assert.equal((await guestOrder([{ drink_id: beer.id, qty: 1, mixer: 'Coke' }])).status, 400)
@@ -209,7 +210,7 @@ test('spirits need a mixer from the list or "Other: …", other drinks refuse on
     { drink_id: bourbon.id, qty: 1, mixer: 'Coke Zero' },
     { drink_id: bourbon.id, qty: 1, mixer: 'On the rocks' },
     { drink_id: bourbon.id, qty: 2, mixer: 'Coke Zero' },
-    { drink_id: bourbon.id, qty: 1, mixer: 'Pineapple juice' },
+    { drink_id: bourbon.id, qty: 1, mixer: 'Ginger Beer' },
     { drink_id: bourbon.id, qty: 1, mixer: 'Other:   lime  & a splash of soda ' },
     { drink_id: beer.id, qty: 1 },
   ])
@@ -217,7 +218,7 @@ test('spirits need a mixer from the list or "Other: …", other drinks refuse on
   assert.deepEqual(ok.body.items.map((i) => [i.drink_name, i.mixer, i.qty]), [
     ['Bourbon', 'Coke Zero', 3],
     ['Bourbon', 'On the rocks', 1],
-    ['Bourbon', 'Pineapple juice', 1],
+    ['Bourbon', 'Ginger Beer', 1],
     ['Bourbon', 'Other: lime & a splash of soda', 1],
     ['Beer', null, 1],
   ])

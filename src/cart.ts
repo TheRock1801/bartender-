@@ -36,9 +36,6 @@ export function itemLabel(name: string, mixer: string | null | undefined, streng
   return s
 }
 
-// Juices sit under one "Juice" heading on the mixer list.
-export const isJuice = (m: string) => /\bjuice$/i.test(m)
-
 // Drinks grouped into the server's tab order; any unknown category is appended.
 export function groupByTab(drinks: Drink[], categories: string[]): [string, Drink[]][] {
   const order = [...categories, ...drinks.map((d) => d.category).filter((c) => !categories.includes(c))]

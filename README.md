@@ -11,7 +11,7 @@ Was the Aria & Jansen bartender app; written over and restyled to Riley and Jasm
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Juice with a flavour, Other with a note, On the rocks, plus an optional light pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order — it's on us!". Live status of your drinks sits at the top. |
+| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Other with a note, On the rocks, plus an optional light pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order — it's on us!". Live status of your drinks sits at the top. |
 | `/bar` | Bartenders | Shared PIN, that's it. Orders tab with All / New / Preparing / Made filters, order numbers, time, drink, collect-or-table and a status pill; tap a row for the actions (Making it, Made it, Put back, Cancel, Reopen). + Order for verbal orders, Menu to add drinks, recipes, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.
@@ -53,7 +53,7 @@ Already wired up from the first wedding: pushing to `main` deploys on Vercel, wh
 
 ## Starting menu
 
-Spirits: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac. Cocktails: Espresso Martini, Aperol Spritz, Whiskey Sour. Beer & Wine: Beer, Red wine, White wine, Sparkling wine. Non-alcoholic: Lemonade, Juice, Sparkling water. Change any of it from the bar's Menu tab.
+Spirits: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac. Cocktails: Aperol Spritz, Margarita, Whiskey Old Fashioned, Bourbon Old Fashioned. Beer & Wine: Beer, Red wine, White wine, Sparkling wine. Non-alcoholic: Lemonade, Sparkling water (no juices). Change any of it from the bar's Menu tab.
 
 ## Look
 

@@ -62,18 +62,16 @@ insert into drinks (name, description, category, sort) values
   ('Rum', '', 'Spirits', 14),
   ('Brandy', '', 'Spirits', 15),
   ('Cognac', '', 'Spirits', 16),
-  ('Espresso Martini', 'Vodka, coffee liqueur, espresso', 'Cocktails', 20),
-  ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 21),
-  ('Whiskey Sour', 'Whiskey, lemon, sugar, egg white', 'Cocktails', 22),
+  ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
+  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
+  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
+  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
   ('Sparkling wine', '', 'Beer & Wine', 33),
   ('Lemonade', '', 'Non-alcoholic', 40),
-  ('Orange juice', '', 'Non-alcoholic', 41),
-  ('Pineapple juice', '', 'Non-alcoholic', 42),
-  ('Cranberry juice', '', 'Non-alcoholic', 43),
-  ('Sparkling water', '', 'Non-alcoholic', 44)
+  ('Sparkling water', '', 'Non-alcoholic', 41)
 on conflict do nothing;
 
 insert into settings (key, value) values

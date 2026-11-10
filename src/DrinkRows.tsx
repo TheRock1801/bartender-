@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Drink, Strength } from './api'
 import { BackArrow, Check, Glass } from './art'
-import { cartKey, drinkQty, isJuice, itemLabel, type Cart } from './cart'
+import { cartKey, drinkQty, itemLabel, type Cart } from './cart'
 
 // One tab's worth of drinks. A spirit row has a "Choose" button that opens the mixer
 // page (MixerSheet); every other row is Add, then − n +. Shared by the guest menu and
@@ -55,8 +55,8 @@ export function Stepper({ qty, onDelta, label }: { qty: number; onDelta: (n: num
   )
 }
 
-// Full-screen "Bourbon — Choose your mixer" page: a radio list, juice flavours under
-// "Juice", a free-text "Other", an optional pour, then "Add to order".
+// Full-screen "Bourbon — Choose your mixer" page: a radio list, a free-text "Other",
+// an optional pour, then "Add to order".
 export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, onClose }: {
   drink: Drink
   mixers: string[]
@@ -66,14 +66,11 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
   onAdd: (mixer: string, strength: Strength | null) => void
   onClose: () => void
 }) {
-  const plain = mixers.filter((m) => !isJuice(m))
-  const juices = mixers.filter(isJuice)
   const [mixer, setMixer] = useState<string | null>(null)   // one of mixers, or "Other"
-  const [juice, setJuice] = useState<string | null>(null)
   const [other, setOther] = useState('')
   const [strength, setStrength] = useState<Strength | null>(null)
 
-  const chosen = mixer === 'Juice' ? juice : mixer === otherMixer ? (other.trim() ? `Other: ${other.trim().slice(0, 40)}` : null) : mixer
+  const chosen = mixer === otherMixer ? (other.trim() ? `Other: ${other.trim().slice(0, 40)}` : null) : mixer
   const inCart = chosen ? cart[cartKey(drink.id, chosen, strength)]?.qty || 0 : 0
 
   return (
@@ -87,31 +84,9 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
         </div>
 
         <div className="mt-6 flex flex-col gap-2" role="radiogroup">
-          {plain.map((m) => (
+          {mixers.map((m) => (
             <MixerRow key={m} title={m} selected={mixer === m} onPick={() => setMixer(m)} />
           ))}
-          {juices.length > 0 && (
-            <>
-              <MixerRow title="Juice" sub={mixer === 'Juice' && juice ? juice.replace(/\s*juice$/i, '') : 'Pick a flavour'} selected={mixer === 'Juice' && !!juice} onPick={() => { setMixer('Juice'); if (!juice) setJuice(juices[0]) }}>
-                <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Juice flavour">
-                  {juices.map((j) => {
-                    const on = mixer === 'Juice' && juice === j
-                    return (
-                      <button
-                        key={j}
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setMixer('Juice'); setJuice(j) }}
-                        className={`rounded-lg border px-3.5 py-2 text-sm ${on ? 'bg-amber text-ivory border-amber' : 'border-cocoa/30 text-cocoa'}`}
-                        aria-pressed={on}
-                      >
-                        {j.replace(/\s*juice$/i, '')}
-                      </button>
-                    )
-                  })}
-                </div>
-              </MixerRow>
-            </>
-          )}
           <MixerRow title={otherMixer} sub="Let us know" selected={mixer === otherMixer} onPick={() => setMixer(otherMixer)} />
           {mixer === otherMixer && (
             <input
