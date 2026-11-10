@@ -264,9 +264,9 @@ function OrderRow({ order, nowMs, expanded, onToggle, act, onShowDrink }: {
             </li>
           </ul>
           <div className="mt-3 flex gap-2 items-center flex-wrap">
-            {order.status === 'new' && <button className="btn-primary flex-1" onClick={() => act(order, 'start')}>Making it</button>}
-            {order.status === 'making' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'made')}>Made it</button>}
-            {order.status === 'ready' && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'made')}>Made it</button>}
+            {/* One tap finishes an order from any open state; "Making it" is optional, for when the bar wants a Preparing queue. */}
+            {['new', 'making', 'ready'].includes(order.status) && <button className="btn-dark flex-1 !bg-sage" onClick={() => act(order, 'made')}>Made it</button>}
+            {order.status === 'new' && <button className="btn-soft" onClick={() => act(order, 'start')}>Making it</button>}
             {order.status === 'making' && <button className="btn-ghost" onClick={() => act(order, 'putback')}>Put back</button>}
             {['new', 'making', 'ready'].includes(order.status) && <button className="btn-ghost" onClick={() => act(order, 'cancel')}>Cancel</button>}
             {['delivered', 'cancelled'].includes(order.status) && <button className="btn-soft flex-1" onClick={() => act(order, 'reopen')}>Reopen</button>}
