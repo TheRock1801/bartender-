@@ -11,7 +11,7 @@ Was the Aria & Jansen bartender app; written over and restyled to Riley and Jasm
 
 | URL | Who | What |
 |---|---|---|
-| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Other with a note, On the rocks, plus an optional light pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order — it's on us!". Live status of your drinks sits at the top. |
+| `/` | Guests | The bar menu in four tabs (Spirits, Cocktails, Beer & Wine, Non-alcoholic). A spirit opens a "choose your mixer" page (Coke, Coke Zero, Lemonade, Dry Ginger Ale, Soda Water, Tonic Water, Ginger Beer, Other with a note, On the rocks, plus an optional light pour). "Your Order" has − / + per line, Collect from bar or Deliver to my table (with the table number), your name, and "Place order". Live status of your drinks sits at the top. |
 | `/bar` | Bartenders | Shared PIN, that's it. Orders tab with All / New / Preparing / Made filters, order numbers, time, drink, collect-or-table and a status pill; tap a row for the actions (Making it, Made it, Put back, Cancel, Reopen). + Order for verbal orders, Menu to add drinks, recipes, mark run out, pause ordering, call last orders. |
 
 Nothing sends email, takes payment, or needs an account.

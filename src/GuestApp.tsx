@@ -53,7 +53,6 @@ export default function GuestApp() {
 
       <div className="divider mt-8 pt-7 text-center">
         <h2 className="script text-[2.6rem]">the bar</h2>
-        <p className="spaced text-sm text-cocoa mt-2">Drinks are on us</p>
       </div>
 
       {settings?.last_orders && <Banner tone="amber">Last orders! Get them in.</Banner>}
@@ -240,7 +239,7 @@ function OrderSheet({ cart, drinks, device, open, onBump, onClose, onPlaced, onE
         <input id="guest-name" className="input" placeholder="e.g. Sarah" autoComplete="given-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
 
         <button className="btn-primary w-full text-lg mt-6" disabled={!ready || busy} onClick={place}>
-          {busy ? 'Sending…' : !open ? 'Ordering is paused' : 'Place order — it’s on us!'}
+          {busy ? 'Sending…' : !open ? 'Ordering is paused' : 'Place order'}
           {!busy && open && <span className="ml-2" aria-hidden="true">›</span>}
         </button>
         {!name.trim() && count > 0 && <p className="text-xs text-stone text-center mt-2">Pop your name in so we know whose drink it is.</p>}
