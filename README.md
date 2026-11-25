@@ -53,7 +53,7 @@ Already wired up from the first wedding: pushing to `main` deploys on Vercel, wh
 
 ## Starting menu
 
-Spirits: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac. Cocktails: Aperol Spritz, Moscow Mule, Punch. Beer & Wine: Beer, Red wine, White wine, Sparkling wine. Non-alcoholic: Lemonade, Sparkling water (no juices). Change any of it from the bar's Menu tab.
+Spirits: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac. Cocktails: Aperol Spritz, Moscow Mule. Beer & Wine: Beer, Red wine, White wine, Sparkling wine. Non-alcoholic: Punch, Lemonade, Sparkling water (no juices). Change any of it from the bar's Menu tab.
 
 ## Look
 

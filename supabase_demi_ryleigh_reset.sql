@@ -11,7 +11,7 @@
 -- What it does: makes sure every table/column this version of the app needs exists,
 -- drops the old guests table, throws away orders from before today (the A&J wedding and
 -- any old tests), and makes the drinks table match the menu in lib/store.js exactly
--- (Spirits / Aperol Spritz, Moscow Mule, Punch / Beer & Wine /
+-- (Spirits / Aperol Spritz, Moscow Mule / Beer & Wine /
 -- Lemonade, Sparkling water). Drinks not on that list are deleted; past order lines keep
 -- their drink_name so nothing in the history breaks.
 
@@ -108,7 +108,7 @@ with new_menu (name, description, category, sort) as (values
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
   ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
-  ('Punch', 'House punch', 'Cocktails', 22),
+  ('Punch', 'Non-alcoholic house punch', 'Non-alcoholic', 39),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -132,7 +132,7 @@ with new_menu (name, description, category, sort) as (values
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
   ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
-  ('Punch', 'House punch', 'Cocktails', 22),
+  ('Punch', 'Non-alcoholic house punch', 'Non-alcoholic', 39),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -154,7 +154,7 @@ with new_menu (name, description, category, sort) as (values
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
   ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
-  ('Punch', 'House punch', 'Cocktails', 22),
+  ('Punch', 'Non-alcoholic house punch', 'Non-alcoholic', 39),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -176,7 +176,7 @@ with new_menu (name, description, category, sort) as (values
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
   ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
-  ('Punch', 'House punch', 'Cocktails', 22),
+  ('Punch', 'Non-alcoholic house punch', 'Non-alcoholic', 39),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),

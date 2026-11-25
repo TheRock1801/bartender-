@@ -64,7 +64,7 @@ insert into drinks (name, description, category, sort) values
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
   ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
-  ('Punch', 'House punch', 'Cocktails', 22),
+  ('Punch', 'Non-alcoholic house punch', 'Non-alcoholic', 39),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
