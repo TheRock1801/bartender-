@@ -11,7 +11,7 @@
 -- What it does: makes sure every table/column this version of the app needs exists,
 -- drops the old guests table, throws away orders from before today (the A&J wedding and
 -- any old tests), and makes the drinks table match the menu in lib/store.js exactly
--- (Spirits / Aperol Spritz, Margarita, Whiskey + Bourbon Old Fashioned / Beer & Wine /
+-- (Spirits / Aperol Spritz, Moscow Mule, Punch / Beer & Wine /
 -- Lemonade, Sparkling water). Drinks not on that list are deleted; past order lines keep
 -- their drink_name so nothing in the history breaks.
 
@@ -107,9 +107,8 @@ with new_menu (name, description, category, sort) as (values
   ('Brandy', '', 'Spirits', 15),
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
-  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
-  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
-  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
+  ('Punch', 'House punch', 'Cocktails', 22),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -132,9 +131,8 @@ with new_menu (name, description, category, sort) as (values
   ('Brandy', '', 'Spirits', 15),
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
-  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
-  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
-  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
+  ('Punch', 'House punch', 'Cocktails', 22),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -155,9 +153,8 @@ with new_menu (name, description, category, sort) as (values
   ('Brandy', '', 'Spirits', 15),
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
-  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
-  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
-  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
+  ('Punch', 'House punch', 'Cocktails', 22),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -178,9 +175,8 @@ with new_menu (name, description, category, sort) as (values
   ('Brandy', '', 'Spirits', 15),
   ('Cognac', '', 'Spirits', 16),
   ('Aperol Spritz', 'Aperol, prosecco, soda, orange', 'Cocktails', 20),
-  ('Margarita', 'Tequila, lime, triple sec, salt rim', 'Cocktails', 21),
-  ('Whiskey Old Fashioned', 'Whiskey, sugar, bitters, orange peel', 'Cocktails', 22),
-  ('Bourbon Old Fashioned', 'Bourbon, sugar, bitters, orange peel', 'Cocktails', 23),
+  ('Moscow Mule', 'Vodka, ginger beer, lime', 'Cocktails', 21),
+  ('Punch', 'House punch', 'Cocktails', 22),
   ('Beer', '', 'Beer & Wine', 30),
   ('Red wine', '', 'Beer & Wine', 31),
   ('White wine', '', 'Beer & Wine', 32),
@@ -198,5 +194,5 @@ insert into settings (key, value) values
   ('last_orders', 'false'::jsonb)
 on conflict (key) do update set value = excluded.value;
 
--- Check: should list the 17 drinks above in menu order.
+-- Check: should list the 16 drinks above in menu order.
 select category, name, sort, available from drinks order by sort;
