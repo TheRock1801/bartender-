@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react'
 import { api, deviceId, minutesAgo, store, stored, type Drink, type Fulfilment, type Order, type Strength } from './api'
-import { BackArrow, Check, CollectIcon, CoupleNames, DeliverIcon, Glass, HeaderArt } from './art'
+import { BackArrow, Check, CollectIcon, CoupleNames, DeliverIcon } from './art'
 import { bumpCart, cartCount, cartLines, groupByTab, itemLabel, type Cart } from './cart'
 import { CartSummary, DrinkRows, MixerSheet } from './DrinkRows'
 import { usePoll } from './usePoll'
 
-const NAME_KEY = 'rj_guest_name'
-const FULFILMENT_KEY = 'rj_fulfilment'
-const TABLE_KEY = 'rj_table'
+const NAME_KEY = 'dr_guest_name'
+const FULFILMENT_KEY = 'dr_fulfilment'
+const TABLE_KEY = 'dr_table'
 
-// Guest flow, as on the mood board: the bar menu → (spirit) choose your mixer → your order
-// (collect or deliver, your name) → placed. No sign-in: the name is asked for with the order
-// and remembered on the phone.
+// Guest flow: the menu → (spirit) choose your mixer → your order (collect or deliver,
+// your name) → placed. No sign-in: the name is asked for with the order and remembered
+// on the phone. Styled in the Aria & Jansen stationery look.
 export default function GuestApp() {
   const device = useMemo(deviceId, [])
   const menu = usePoll(api.menu, 15000)
@@ -47,37 +47,33 @@ export default function GuestApp() {
   const doneOrders = orders.filter((o) => !openOrders.includes(o)).slice(0, 3)
 
   return (
-    <main className="min-h-dvh pb-28 px-5 pt-6 max-w-lg mx-auto">
-      <HeaderArt />
-      <div className="mt-2"><CoupleNames /></div>
+    <main className="min-h-dvh pb-28 px-6 pt-8 max-w-lg mx-auto">
+      <CoupleNames />
 
-      <div className="divider mt-8 pt-7 text-center">
-        <h2 className="script text-[2.6rem]">the bar</h2>
-      </div>
-
-      {settings?.last_orders && <Banner tone="amber">Last orders! Get them in.</Banner>}
-      {!open && <Banner tone="dark">The bar's taking a short break, back in a few minutes.</Banner>}
-      {menu.error && !menu.data && <Banner tone="dark">Can't reach the bar right now, probably the signal. Hang about.</Banner>}
+      {settings?.last_orders && <Banner tone="amber">last orders! get 'em in.</Banner>}
+      {!open && <Banner tone="dark">bar's taking a breather, back in a few.</Banner>}
+      {menu.error && !menu.data && <Banner tone="dark">can't reach the bar right now, dodgy signal probably. hang about.</Banner>}
 
       {openOrders.length > 0 && (
-        <section className="mt-8">
-          <h3 className="label mb-3">Your drinks</h3>
+        <section className="mt-8 divider pt-5">
+          <h2 className="display text-2xl mb-3">your drinks.</h2>
           <div className="flex flex-col gap-2">
             {openOrders.map((o) => <GuestOrderCard key={o.id} order={o} />)}
           </div>
         </section>
       )}
 
-      <section className="mt-8">
-        {!menu.data && !menu.error && <p className="text-stone text-center">One moment…</p>}
+      <section className="mt-8 divider pt-5">
+        <h2 className="display text-2xl mb-3">menu.</h2>
+        {!menu.data && !menu.error && <p className="text-stone">one sec…</p>}
 
         {tabs.length > 0 && (
-          <div className="flex gap-5 border-b border-taupe/70 overflow-x-auto">
+          <div className="flex gap-6 border-b border-taupe/30 mb-5 overflow-x-auto">
             {tabs.map(([cat]) => (
               <button
                 key={cat}
                 onClick={() => setTab(cat)}
-                className={`pb-2.5 -mb-px whitespace-nowrap spaced text-[0.7rem] border-b-2 transition ${activeTab === cat ? 'border-espresso text-espresso' : 'border-transparent text-stone'}`}
+                className={`pb-2 -mb-px whitespace-nowrap tab border-b-2 transition ${activeTab === cat ? 'border-cocoa text-cocoa' : 'border-transparent text-cocoa/50'}`}
                 aria-pressed={activeTab === cat}
               >
                 {cat}
@@ -88,9 +84,9 @@ export default function GuestApp() {
 
         {activeTab && (
           <>
-            <p className="text-sm text-stone mt-5 mb-1">
-              {activeTab === spiritsCategory ? 'Pick a spirit, then choose your mixer.' : `Tap Add for anything you'd like.`}
-            </p>
+            {activeTab === spiritsCategory && activeDrinks.length > 0 && (
+              <p className="font-mono text-xs text-cocoa/60 mb-1">pick a spirit, then what you want with it.</p>
+            )}
             <DrinkRows
               key={activeTab}
               drinks={activeDrinks}
@@ -105,22 +101,22 @@ export default function GuestApp() {
       </section>
 
       {doneOrders.length > 0 && (
-        <section className="mt-8">
-          <h3 className="label mb-3">Earlier</h3>
+        <section className="mt-8 divider pt-5">
+          <h2 className="display text-2xl mb-3">earlier.</h2>
           <div className="flex flex-col gap-2 opacity-70">
             {doneOrders.map((o) => <GuestOrderCard key={o.id} order={o} />)}
           </div>
         </section>
       )}
 
-      <a href="/bar" className="block mt-12 text-center text-xs text-stone/70 underline underline-offset-4">Bar staff</a>
+      <a href="/bar" className="btn-ghost mt-12 text-sm px-0 font-mono lowercase">bar staff →</a>
 
       {count > 0 && open && !ordering && !choosing && (
         <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">
           <div className="max-w-lg mx-auto fade-up">
             <button className="btn-primary w-full text-lg" onClick={() => setOrdering(true)}>
-              View your order · {count} {count === 1 ? 'drink' : 'drinks'}
-              <span className="ml-2" aria-hidden="true">›</span>
+              view your order · {count} {count === 1 ? 'drink' : 'drinks'}
+              <span className="ml-2" aria-hidden="true">→</span>
             </button>
           </div>
         </div>
@@ -150,7 +146,7 @@ export default function GuestApp() {
             setCart({})
             setOrdering(false)
             mine.setData((d) => ({ orders: [order, ...(d?.orders ?? [])] }))
-            flash('ok', order.fulfilment === 'deliver' ? `Order #${order.order_no} is in. We'll bring it to table ${order.table_no}.` : `Order #${order.order_no} is in. We'll call you when it's ready at the bar.`)
+            flash('ok', order.fulfilment === 'deliver' ? `on it! #${order.order_no} is coming to table ${order.table_no}.` : `on it! #${order.order_no}, we'll call you up to the bar.`)
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
           onError={(m) => { flash('err', m); menu.refresh() }}
@@ -158,7 +154,7 @@ export default function GuestApp() {
       )}
 
       {toast && (
-        <div className={`fixed top-4 inset-x-4 mx-auto max-w-md z-40 rounded-xl px-4 py-3 text-center fade-up ${toast.kind === 'ok' ? 'bg-sage text-ivory' : 'bg-amber text-ivory'}`}>
+        <div className={`fixed top-4 inset-x-4 mx-auto max-w-md z-40 rounded px-4 py-3 text-center font-semibold fade-up ${toast.kind === 'ok' ? 'bg-sage text-cream' : 'bg-amber text-cream'}`}>
           {toast.text}
         </div>
       )}
@@ -201,48 +197,47 @@ function OrderSheet({ cart, drinks, device, open, onBump, onClose, onPlaced, onE
 
   return (
     <div className="fixed inset-0 z-30 bg-cream overflow-y-auto" role="dialog" aria-modal="true" aria-label="Your order">
-      <main className="min-h-dvh max-w-lg mx-auto px-5 pt-3 pb-12">
+      <main className="min-h-dvh max-w-lg mx-auto px-6 pt-4 pb-12">
         <BackArrow onClick={onClose} label="Back to the menu" />
-        <HeaderArt className="max-w-[260px] -mt-4" />
-        <h2 className="script text-[2.9rem] text-center mt-1">Your Order</h2>
+        <h2 className="display text-[2.5rem] mt-2">your order.</h2>
 
-        <div className="mt-6">
+        <div className="mt-5 divider pt-2">
           <CartSummary cart={cart} drinks={drinks} onBump={onBump} />
-          {count === 0 && <button className="btn-soft mt-3" onClick={onClose}>Back to the menu</button>}
+          {count > 0 && <p className="font-mono text-xs text-cocoa/60 mt-2">tap − to drop one.</p>}
+          {count === 0 && <button className="btn-soft mt-3" onClick={onClose}>back to the menu</button>}
         </div>
 
-        <h3 className="text-lg text-espresso mt-8">How would you like your drink?</h3>
-        <div className="grid grid-cols-2 gap-3 mt-3" role="radiogroup">
+        <h3 className="display text-2xl mt-8 divider pt-5">how do you want it?</h3>
+        <div className="grid grid-cols-2 gap-3 mt-4" role="radiogroup">
           <FulfilmentCard
             selected={fulfilment === 'collect'}
             onPick={() => setFulfilment('collect')}
             icon={<CollectIcon />}
-            title="Collect from bar"
-            sub="I'll pick it up at the bar"
+            title="collect from the bar"
+            sub="i'll come grab it"
           />
           <FulfilmentCard
             selected={fulfilment === 'deliver'}
             onPick={() => setFulfilment('deliver')}
             icon={<DeliverIcon />}
-            title="Deliver to my table"
-            sub="Bring it to me"
+            title="bring it to my table"
+            sub="we'll find you"
           />
         </div>
         {fulfilment === 'deliver' && (
-          <div className="mt-4 fade-up">
-            <label className="text-lg text-espresso block mb-2" htmlFor="table-no">Table number</label>
+          <div className="mt-5 fade-up">
+            <label className="label block mb-2" htmlFor="table-no">table number</label>
             <input id="table-no" className="input" placeholder="e.g. 4" inputMode="numeric" value={table} maxLength={12} onChange={(e) => setTable(e.target.value)} />
           </div>
         )}
 
-        <label className="text-lg text-espresso block mt-6 mb-2" htmlFor="guest-name">Your name</label>
-        <input id="guest-name" className="input" placeholder="e.g. Sarah" autoComplete="given-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        <label className="display text-2xl block mt-8 divider pt-5 mb-3" htmlFor="guest-name">what's your name?</label>
+        <input id="guest-name" className="input" placeholder="e.g. Sam" autoComplete="given-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
 
         <button className="btn-primary w-full text-lg mt-6" disabled={!ready || busy} onClick={place}>
-          {busy ? 'Sending…' : !open ? 'Ordering is paused' : 'Place order'}
-          {!busy && open && <span className="ml-2" aria-hidden="true">›</span>}
+          {busy ? 'sending…' : !open ? "bar's paused" : 'complete order'}
         </button>
-        {!name.trim() && count > 0 && <p className="text-xs text-stone text-center mt-2">Pop your name in so we know whose drink it is.</p>}
+        {!name.trim() && count > 0 && <p className="font-mono text-xs text-cocoa/60 mt-2">pop your name in so we know whose drink it is.</p>}
       </main>
     </div>
   )
@@ -254,48 +249,49 @@ function FulfilmentCard({ selected, onPick, icon, title, sub }: { selected: bool
       onClick={onPick}
       role="radio"
       aria-checked={selected}
-      className={`card relative flex flex-col items-center text-center gap-1 py-5 border ${selected ? 'border-amber' : 'border-transparent'}`}
+      className={`card relative flex flex-col items-center text-center gap-1 py-5 transition ${selected ? '!bg-cocoa !border-cocoa text-cream' : 'text-cocoa'}`}
     >
-      <span className={`absolute top-2.5 right-2.5 ring-radio w-5 h-5 ${selected ? 'bg-amber border-amber text-ivory' : ''}`}>{selected && <Check />}</span>
-      <span className="text-cocoa">{icon}</span>
-      <span className="text-base text-espresso mt-1 leading-tight">{title}</span>
-      <span className="text-xs text-stone leading-snug">{sub}</span>
+      <span className={`absolute top-2.5 right-2.5 ring-radio w-5 h-5 ${selected ? 'bg-cream border-cream text-cocoa' : ''}`}>{selected && <Check />}</span>
+      <span>{icon}</span>
+      <span className="font-semibold mt-1 leading-tight">{title}</span>
+      <span className={`font-mono text-[0.7rem] leading-snug ${selected ? 'text-cream/70' : 'text-cocoa/60'}`}>{sub}</span>
     </button>
   )
 }
 
 function Banner({ tone, children }: { tone: 'amber' | 'dark'; children: React.ReactNode }) {
-  const cls = tone === 'amber' ? 'bg-amber text-ivory' : 'bg-espresso text-ivory'
-  return <div className={`mt-6 rounded-xl px-4 py-3 text-center ${cls}`}>{children}</div>
+  const cls = tone === 'amber' ? 'bg-amber text-cream' : 'bg-taupe text-cream'
+  return <div className={`mt-5 rounded px-4 py-3 font-medium ${cls}`}>{children}</div>
 }
 
 function GuestOrderCard({ order }: { order: Order }) {
-  const made = order.fulfilment === 'deliver' ? `Made, on its way to table ${order.table_no}` : 'Made, come grab it at the bar'
+  const made = order.fulfilment === 'deliver' ? `made, on its way to table ${order.table_no}` : 'made, come grab it at the bar'
   const label: Record<Order['status'], string> = {
-    new: 'In the queue',
-    making: 'Being made',
+    new: 'in the queue',
+    making: 'being made',
     ready: made,
     delivered: made,
-    cancelled: 'Cancelled',
+    cancelled: 'cancelled',
   }
   const tone: Record<Order['status'], string> = {
     new: 'bg-sand text-cocoa',
-    making: 'bg-amber text-ivory',
-    ready: 'bg-sage text-ivory',
-    delivered: 'bg-sage text-ivory',
-    cancelled: 'bg-mist text-stone',
+    making: 'bg-amber/20 text-amber',
+    ready: 'bg-sage/20 text-sage',
+    delivered: 'bg-sage/20 text-sage',
+    cancelled: 'bg-sand/70 text-cocoa/80',
   }
-  const first = order.items[0]
   return (
-    <div className="card flex items-center gap-3">
-      {first && <Glass name={first.drink_name} size={44} />}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs text-stone">#{order.order_no} · {minutesAgo(order.created_at)} min ago · {order.fulfilment === 'deliver' ? `Table ${order.table_no}` : 'Collect at bar'}</div>
-        <div className="text-base text-espresso leading-snug mt-0.5">
+    <div className="card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-semibold">
           {order.items.map((i) => (i.qty > 1 ? `${i.qty}× ` : '') + itemLabel(i.drink_name, i.mixer, i.strength)).join(', ')}
         </div>
-        <span className={`pill mt-2 ${tone[order.status]}`}>{label[order.status]}</span>
+        <span className="font-mono text-xs text-cocoa/50 whitespace-nowrap">#{order.order_no}</span>
       </div>
+      <div className="font-mono text-[0.7rem] text-cocoa/50 mt-1">
+        {minutesAgo(order.created_at)} min ago · {order.fulfilment === 'deliver' ? `table ${order.table_no}` : 'collect at bar'}
+      </div>
+      <span className={`pill mt-2 ${tone[order.status]}`}>{label[order.status]}</span>
     </div>
   )
 }

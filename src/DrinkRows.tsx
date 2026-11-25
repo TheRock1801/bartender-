@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Drink, Strength } from './api'
-import { BackArrow, Check, Glass } from './art'
+import { BackArrow, Check } from './art'
 import { cartKey, drinkQty, itemLabel, type Cart } from './cart'
 
 // One tab's worth of drinks. A spirit row has a "Choose" button that opens the mixer
@@ -15,26 +15,25 @@ export function DrinkRows({ drinks, cart, onBump, onChoose, isSpirit, canOrder, 
   canOrder: (d: Drink) => boolean
   compact?: boolean
 }) {
-  if (!drinks.length) return <p className="text-sm text-stone px-1 py-4">Nothing here yet.</p>
+  if (!drinks.length) return <p className="font-mono text-sm text-cocoa/60 px-1 py-4">nothing here yet.</p>
   return (
     <div className="flex flex-col">
       {drinks.map((d) => {
         const off = !canOrder(d)
         const total = drinkQty(cart, d.id)
         return (
-          <div key={d.id} className={`row flex items-center gap-4 ${compact ? 'py-2.5' : ''} ${off ? 'opacity-60' : ''}`}>
-            <Glass name={d.name} size={compact ? 40 : 60} />
+          <div key={d.id} className={`row flex items-center gap-3 ${compact ? 'py-2.5' : 'py-4'} ${off ? 'opacity-60' : ''}`}>
             <div className="flex-1 min-w-0">
-              <div className={`display ${compact ? 'text-xl' : 'text-2xl'}`}>{d.name}</div>
-              {d.description && !compact && <div className="text-sm text-stone">{d.description}</div>}
-              {!d.available && <span className="pill bg-sand text-stone mt-1">Run out, sorry</span>}
+              <div className={`font-semibold leading-tight ${compact ? '' : 'text-lg'}`}>{d.name}</div>
+              {d.description && !compact && <div className="text-sm text-cocoa/60">{d.description}</div>}
+              {!d.available && <span className="pill bg-sand/70 text-cocoa/80 mt-1">all gone, sorry</span>}
             </div>
             {off ? null : isSpirit ? (
-              <button className="btn-soft px-5 py-2.5" onClick={() => onChoose(d)}>
-                {total > 0 ? `${total} added` : 'Choose'}
+              <button className={`btn-soft px-4 py-2 ${total > 0 ? '!bg-cocoa !text-cream' : ''}`} onClick={() => onChoose(d)}>
+                {total > 0 ? `${total} added` : 'choose'}
               </button>
             ) : total === 0 ? (
-              <button className="btn-soft px-6 py-2.5" onClick={() => onBump(d.id, null, 1, null)}>Add</button>
+              <button className="btn-soft px-5 py-2" onClick={() => onBump(d.id, null, 1, null)}>add</button>
             ) : (
               <Stepper qty={total} onDelta={(n) => onBump(d.id, null, n, null)} label={d.name} />
             )}
@@ -49,7 +48,7 @@ export function Stepper({ qty, onDelta, label }: { qty: number; onDelta: (n: num
   return (
     <div className="flex items-center gap-2">
       <button className="step-btn" onClick={() => onDelta(-1)} aria-label={`One fewer ${label}`}>−</button>
-      <span className="w-5 text-center text-base">{qty}</span>
+      <span className="w-6 text-center text-lg font-semibold">{qty}</span>
       <button className="step-btn" onClick={() => onDelta(1)} aria-label={`One more ${label}`}>+</button>
     </div>
   )
@@ -75,24 +74,24 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
 
   return (
     <div className="fixed inset-0 z-30 bg-cream overflow-y-auto" role="dialog" aria-modal="true" aria-label={`${drink.name}: choose your mixer`}>
-      <main className="min-h-dvh max-w-lg mx-auto px-5 pt-3 pb-36">
+      <main className="min-h-dvh max-w-lg mx-auto px-6 pt-4 pb-36">
         <BackArrow onClick={onClose} />
-        <div className="text-center mt-2">
-          <Glass name={drink.name} size={96} className="mx-auto" />
-          <h2 className="display text-4xl mt-3">{drink.name}</h2>
-          <p className="text-stone mt-1">Choose your mixer</p>
+        <div className="mt-2">
+          <p className="eyebrow">{drink.category}</p>
+          <h2 className="display text-[2.5rem] mt-2">{drink.name}.</h2>
+          <p className="font-mono text-xs text-cocoa/60 mt-2">what do you want with it?</p>
         </div>
 
-        <div className="mt-6 flex flex-col gap-2" role="radiogroup">
+        <div className="mt-5 divider flex flex-col" role="radiogroup">
           {mixers.map((m) => (
             <MixerRow key={m} title={m} selected={mixer === m} onPick={() => setMixer(m)} />
           ))}
-          <MixerRow title={otherMixer} sub="Let us know" selected={mixer === otherMixer} onPick={() => setMixer(otherMixer)} />
+          <MixerRow title={otherMixer} sub="tell us what" selected={mixer === otherMixer} onPick={() => setMixer(otherMixer)} />
           {mixer === otherMixer && (
             <input
-              className="input fade-up"
+              className="input fade-up mt-3"
               autoFocus
-              placeholder="What would you like with it?"
+              placeholder="what would you like with it?"
               value={other}
               maxLength={40}
               onChange={(e) => setOther(e.target.value)}
@@ -101,12 +100,12 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
         </div>
 
         {strengths.length > 0 && (
-          <div className="mt-6">
-            <p className="label mb-2">Pour</p>
+          <div className="mt-6 divider pt-5">
+            <p className="label mb-2">pour</p>
             <div className="flex gap-2">
               {([null, ...strengths] as (Strength | null)[]).map((st) => (
-                <button key={st ?? 'regular'} onClick={() => setStrength(st)} className={`rounded-lg border px-4 py-2 text-sm capitalize ${strength === st ? 'bg-espresso text-ivory border-espresso' : 'border-cocoa/30 text-cocoa'}`} aria-pressed={strength === st}>
-                  {st ?? 'Regular'}
+                <button key={st ?? 'regular'} onClick={() => setStrength(st)} className={`rounded border px-3 py-1.5 font-mono text-xs lowercase ${strength === st ? 'bg-amber text-cream border-amber' : 'border-taupe/60 text-cocoa'}`} aria-pressed={strength === st}>
+                  {st ?? 'regular'}
                 </button>
               ))}
             </div>
@@ -117,10 +116,9 @@ export function MixerSheet({ drink, mixers, otherMixer, strengths, cart, onAdd, 
       <div className="fixed inset-x-0 bottom-0 p-4 bg-gradient-to-t from-cream via-cream to-transparent">
         <div className="max-w-lg mx-auto">
           <button className="btn-primary w-full text-lg" disabled={!chosen} onClick={() => chosen && onAdd(chosen, strength)}>
-            {chosen ? `Add ${itemLabel(drink.name, chosen, strength)}` : 'Add to order'}
-            <span className="ml-2" aria-hidden="true">›</span>
+            {chosen ? `add ${itemLabel(drink.name, chosen, strength).toLowerCase()}` : 'pick a mixer'}
           </button>
-          {inCart > 0 && <p className="text-center text-xs text-stone mt-2">{inCart} already in your order</p>}
+          {inCart > 0 && <p className="text-center font-mono text-xs text-cocoa/60 mt-2">{inCart} already in your order</p>}
         </div>
       </div>
     </div>
@@ -133,17 +131,17 @@ function MixerRow({ title, sub, selected, onPick, children }: { title: string; s
     <div
       onClick={onPick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick() } }}
-      className="card w-full text-left py-4 cursor-pointer select-none"
+      className="row w-full text-left py-3.5 cursor-pointer select-none"
       role="radio"
       aria-checked={selected}
       tabIndex={0}
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-base text-espresso">{title}</div>
-          {sub && <div className="text-sm text-stone">{sub}</div>}
+          <div className={`text-lg ${selected ? 'font-semibold' : ''}`}>{title}</div>
+          {sub && <div className="font-mono text-xs text-cocoa/60">{sub}</div>}
         </div>
-        <span className={`ring-radio ${selected ? 'bg-amber border-amber text-ivory' : ''}`}>{selected && <Check />}</span>
+        <span className={`ring-radio ${selected ? 'bg-cocoa border-cocoa text-cream' : ''}`}>{selected && <Check />}</span>
       </div>
       {children}
     </div>
@@ -158,14 +156,13 @@ export function CartSummary({ cart, drinks, onBump }: {
   onBump: (drink_id: string, mixer: string | null, delta: number, strength: Strength | null) => void
 }) {
   const lines = Object.values(cart).filter((l) => l.qty > 0)
-  if (!lines.length) return <p className="text-sm text-stone">Nothing in your order yet.</p>
+  if (!lines.length) return <p className="font-mono text-sm text-cocoa/60 py-3">nothing in here yet.</p>
   const nameOf = (id: string) => drinks.find((d) => d.id === id)?.name ?? 'Drink'
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col">
       {lines.map((l) => (
-        <li key={cartKey(l.drink_id, l.mixer, l.strength)} className="card flex items-center gap-3 py-3">
-          <Glass name={nameOf(l.drink_id)} size={40} />
-          <span className="flex-1 text-base text-espresso">{itemLabel(nameOf(l.drink_id), l.mixer, l.strength)}</span>
+        <li key={cartKey(l.drink_id, l.mixer, l.strength)} className="row flex items-center gap-2">
+          <span className="flex-1 font-semibold">{itemLabel(nameOf(l.drink_id), l.mixer, l.strength)}</span>
           <Stepper qty={l.qty} onDelta={(n) => onBump(l.drink_id, l.mixer, n, l.strength)} label={nameOf(l.drink_id)} />
         </li>
       ))}

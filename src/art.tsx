@@ -489,12 +489,12 @@ export function HeaderArt({ className = '' }: { className?: string }) {
   )
 }
 
-// Script couple name with the date beneath, as on the invitation.
-export function CoupleNames({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
+// The couple's names in the A&J stationery style: a mono eyebrow, then bold lowercase with a full stop.
+export function CoupleNames({ size = 'lg', eyebrow = 'ryleigh and demi · drinks' }: { size?: 'lg' | 'sm'; eyebrow?: string }) {
   return (
-    <div className="text-center">
-      <h1 className={`script ${size === 'lg' ? 'text-[3.4rem]' : 'text-[2.1rem]'}`}>Riley &amp; Jasmine</h1>
-      <p className={`spaced text-stone ${size === 'lg' ? 'text-sm mt-2' : 'text-[0.65rem] mt-0.5'}`}>10 . 11 . 2026</p>
+    <div className="w-full">
+      <p className="eyebrow">{eyebrow}</p>
+      <h1 className={`display mt-2 ${size === 'lg' ? 'text-[2.75rem]' : 'text-3xl'}`}>demi &amp; ryleigh.</h1>
     </div>
   )
 }

@@ -1,13 +1,13 @@
 {
-  "name": "Riley & Jasmine · The Bar",
-  "short_name": "R&J Bar",
-  "description": "Order drinks at Riley and Jasmine's wedding",
+  "name": "Demi & Ryleigh · Drinks",
+  "short_name": "D&R Drinks",
+  "description": "Order drinks at Demi and Ryleigh's wedding",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F7E9CF",
-  "theme_color": "#F7E9CF",
+  "background_color": "#F3E8DB",
+  "theme_color": "#F3E8DB",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

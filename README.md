@@ -1,11 +1,11 @@
-# Riley & Jasmine · The Bar
+# Demi & Ryleigh · Drinks
 
 Phone-based drink ordering for a wedding. Guests scan a QR code, pick a drink, say whether
 they'll collect it from the bar or want it brought to their table, pop their name in, done.
 Whoever is behind the bar sees one live, numbered queue on their own phones and taps each
 order through New → Preparing → Made.
 
-Was the Aria & Jansen bartender app; written over and restyled to Riley and Jasmine's mood board.
+Was the Aria & Jansen bartender app, then Riley & Jasmine's (with their mood-board look). Since 2026-11-25 it's Demi & Ryleigh's: the Riley & Jasmine flow, back in the Aria & Jansen look.
 
 ## The two screens
 
@@ -36,7 +36,7 @@ npm run build   # type-check + production bundle
 
 Already wired up from the first wedding: pushing to `main` deploys on Vercel, which talks to the existing Supabase project.
 
-1. **Supabase**: paste `supabase_riley_jasmine_reset.sql` into the SQL editor and run it once. It wipes the old wedding's orders and menu, adds the new columns, and loads the new menu. (A brand-new project would use `supabase_schema.sql` instead.)
+1. **Supabase**: paste `supabase_demi_ryleigh_reset.sql` into the SQL editor and run it once. It works from any starting state, makes the menu match `lib/store.js`, clears every earlier order and restarts order numbers at #1. (A brand-new project would use `supabase_schema.sql` instead.)
 2. **Vercel** env vars are unchanged: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BAR_PIN`. Change the PIN if the old crew still know it. Check Settings → Deployment Protection is off for Production, so guests don't hit a Vercel login.
 3. Open `/bar`, enter the PIN, check the menu, place a test order from a phone.
 4. Make a QR code for the site root and print a few signs. Guests never need `/bar`.
@@ -57,7 +57,7 @@ Spirits: Whiskey, Bourbon, Gin, Vodka, Rum, Brandy, Cognac. Cocktails: Aperol Sp
 
 ## Look
 
-From the mood board: cream page (`cream`) with lighter cream cards (`ivory`), espresso text, terracotta (`amber`) for primary buttons and "Preparing", olive (`sage`) for "Ready", grey (`mist`) for "Delivered". Italianno script for the couple's name, "the bar" and "Your Order"; Cormorant Garamond for drink names and headings; Jost for everything else, spaced capitals for tabs and labels. The floral header and the glass illustrations are crops of the mood board in `public/art` (swap them for the real artwork when it arrives; `src/art.tsx` maps a spirit's name to its glass). Tokens in `tailwind.config.js`, reusable classes in `src/index.css`.
+The Aria & Jansen stationery look: warm ivory paper (`cream`) with faint grain, espresso text (`cocoa`), fine taupe hairlines, burnt orange (`amber`) used sparingly, muted green (`sage`) for made orders. League Spartan extra-bold lowercase headings with a full stop ("demi & ryleigh.", "your order."), IBM Plex Mono for small labels, Inter for everything else. Softly squared solid buttons, no shadows, no drink illustrations (the inline SVGs in `src/art.tsx` are still there, unused, if they're ever wanted back). Tokens in `tailwind.config.js`, reusable classes in `src/index.css`.
 
 ## Layout
 
@@ -72,8 +72,8 @@ src/art.tsx         illustrations, couple name block, icons
 src/cart.ts         cart helpers and item labels
 src/api.ts          typed client + localStorage helpers
 src/usePoll.ts      visibility-aware polling hook
-public/art          header florals + glass illustrations (cropped from the mood board)
-supabase_riley_jasmine_reset.sql  run once on the existing project (wipe + new columns + new menu)
+public/art          the Riley & Jasmine mood board (old brief, unused)
+supabase_demi_ryleigh_reset.sql   run once on the existing project before the wedding (any state -> clean menu, no orders)
 supabase_schema.sql               the same end state from scratch, for a brand-new project only
 tests/api.test.js   end-to-end API tests
 ```

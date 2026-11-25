@@ -94,7 +94,7 @@ export const api = {
 }
 
 export function deviceId(): string {
-  const key = 'rj_device_id'
+  const key = 'dr_device_id'
   try {
     let id = localStorage.getItem(key)
     if (!id) {
